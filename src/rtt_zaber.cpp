@@ -31,7 +31,7 @@ void rtt_zaber::updateHook(){
   geometry_msgs::msg::WrenchStamped wrench;
 
   if( port_input_wrench.read( wrench ) == RTT::NewData ){
-    
+	std::cout << wrench.wrench.force.x << std::endl;    
   }
 
 }
