@@ -33,16 +33,16 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-set(
-  AMENT_CMAKE_ENVIRONMENT_HOOKS_DESC_rtt_component_path
-  "prepend-non-duplicate;RTT_COMPONENT_PATH;lib/orocos"
-)
-ament_environment_hooks(env_hook/rtt_component_path.sh.in)
-set(
-  AMENT_CMAKE_ENVIRONMENT_HOOKS_DESC_pkg_config_path
-  "prepend-non-duplicate;PKG_CONFIG_PATH;lib/pkgconfig"
-)
-ament_environment_hooks(env_hook/pkg_config_path.sh.in)
+#set(
+#  AMENT_CMAKE_ENVIRONMENT_HOOKS_DESC_rtt_component_path
+#  "prepend-non-duplicate;RTT_COMPONENT_PATH;lib/orocos"
+#)
+#ament_environment_hooks(env_hook/rtt_component_path.sh.in)
+#set(
+#  AMENT_CMAKE_ENVIRONMENT_HOOKS_DESC_pkg_config_path
+#  "prepend-non-duplicate;PKG_CONFIG_PATH;lib/pkgconfig"
+#)
+#ament_environment_hooks(env_hook/pkg_config_path.sh.in)
 
 ament_package()
 
