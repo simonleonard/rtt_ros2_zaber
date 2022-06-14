@@ -1,0 +1,16 @@
+import("rtt_ros2")
+import("rtt_ros2_node")
+import("rtt_ros2_topics")
+import("rtt_ros2_geometry_msgs")
+import("rtt_ros2_sensor_msgs")
+import( "rtt_zaber")
+
+loadComponent("zaber", "rtt_zaber" )
+
+setActivity("zaber", 1, 0, ORO_SCHED_OTHER)
+
+stream("zaber.wrench", ros.topic("/wrench", false)  )
+
+zaber.configure()
+zaber.start()
+
