@@ -12,7 +12,7 @@ using namespace zaber::motion;
 using namespace zaber::motion::ascii;
 
 
-class rtt_zaber : public RTT::TaskContext{
+class rtt_ros2_zaber : public RTT::TaskContext{
 
 private:
 
@@ -34,7 +34,7 @@ private:
   Connection connection;
 public:
 
-  rtt_zaber( const std::string& name );
+  rtt_ros2_zaber( const std::string& name );
 
   virtual bool configureHook();
   virtual bool startHook();

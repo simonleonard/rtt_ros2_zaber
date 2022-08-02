@@ -1,0 +1,20 @@
+import("rtt_ros2")
+import("rtt_ros2_node")
+import("rtt_ros2_topics")
+import("rtt_ros2_geometry_msgs")
+import("rtt_ros2_sensor_msgs")
+import("rtt_ros2_std_msgs")
+# import("rtt_ros2_primitives_typekit")
+import("rtt_zaber")
+
+loadComponent("zaber", "rtt_zaber" )
+setActivity("zaber", 0.01, 0, ORO_SCHED_OTHER)
+
+stream("zaber.wrench", ros.topic("/optoforce/measured_cf", false)  )
+stream("zaber.teleop_control", ros.topic("/spacenav/twist",false))
+# stream("zaber.emergency_stop", ros.topic("/emergency_stop", false)  )
+
+zaber.zaber_axis = 1
+
+zaber.configure()
+zaber.start()

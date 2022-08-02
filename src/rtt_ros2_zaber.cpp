@@ -1,9 +1,9 @@
-#include <rtt_zaber/rtt_zaber.hpp>
+#include <rtt_ros2_zaber/rtt_ros2_zaber.hpp>
 #include <rtt/internal/GlobalService.hpp>
 
 #include <rtt/Component.hpp>
 
-rtt_zaber::rtt_zaber( const std::string& name ) :
+rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
   RTT::TaskContext( name ),
   port_input_wrench( "wrench" ),
   port_input_teleop("teleop_control")
@@ -23,15 +23,15 @@ rtt_zaber::rtt_zaber( const std::string& name ) :
   addPort("teleop_control",port_input_teleop);
   // addPort("emergency_stop", port_emergency_stop);
 
-  addOperation("Home", &rtt_zaber::home, this, RTT::OwnThread);
-  addOperation("MoveRelative", &rtt_zaber::move_relatvie, this, RTT::OwnThread);
-  addOperation("MoveAbsolute", &rtt_zaber::move_absolute, this, RTT::OwnThread);
-  addOperation("MoveVelocity", &rtt_zaber::move_velocity, this, RTT::OwnThread);
-  addOperation("StopAxis", &rtt_zaber::stop_axis, this, RTT::OwnThread);
-  addOperation("MoveMax", &rtt_zaber::move_max, this, RTT::OwnThread);
-  addOperation("MoveMin", &rtt_zaber::move_min, this, RTT::OwnThread);
-  addOperation("TeleopStart", &rtt_zaber::teleop_start, this, RTT::OwnThread);
-  addOperation("TeleopStop", &rtt_zaber::teleop_stop, this, RTT::OwnThread);
+  addOperation("Home", &rtt_ros2_zaber::home, this, RTT::OwnThread);
+  addOperation("MoveRelative", &rtt_ros2_zaber::move_relatvie, this, RTT::OwnThread);
+  addOperation("MoveAbsolute", &rtt_ros2_zaber::move_absolute, this, RTT::OwnThread);
+  addOperation("MoveVelocity", &rtt_ros2_zaber::move_velocity, this, RTT::OwnThread);
+  addOperation("StopAxis", &rtt_ros2_zaber::stop_axis, this, RTT::OwnThread);
+  addOperation("MoveMax", &rtt_ros2_zaber::move_max, this, RTT::OwnThread);
+  addOperation("MoveMin", &rtt_ros2_zaber::move_min, this, RTT::OwnThread);
+  addOperation("TeleopStart", &rtt_ros2_zaber::teleop_start, this, RTT::OwnThread);
+  addOperation("TeleopStop", &rtt_ros2_zaber::teleop_stop, this, RTT::OwnThread);
   
   addProperty("zaber_axis", zaber_axis);
 
@@ -39,7 +39,7 @@ rtt_zaber::rtt_zaber( const std::string& name ) :
   
 }
 
-bool rtt_zaber::configureHook(){
+bool rtt_ros2_zaber::configureHook(){
   std::cout << "configureHook_1" << std::endl;
 
   connection = Connection::openSerialPort("/dev/ttyUSB1");
@@ -55,7 +55,7 @@ bool rtt_zaber::configureHook(){
   return true;
 }
 
-bool rtt_zaber::startHook(){
+bool rtt_ros2_zaber::startHook(){
   std::cout << "startupHook" << std::endl;
   std::cout << "Zaber Axis: " << zaber_axis << std::endl;
   // old_time = rclcpp::Clock::Clock::now();
@@ -63,7 +63,7 @@ bool rtt_zaber::startHook(){
   return true;
 }
 
-void rtt_zaber::updateHook(){
+void rtt_ros2_zaber::updateHook(){
   geometry_msgs::msg::WrenchStamped wrench;
 
   if( port_input_wrench.read( wrench ) == RTT::NewData ){
@@ -108,16 +108,16 @@ void rtt_zaber::updateHook(){
   }
 }
 
-void rtt_zaber::stopHook(){
+void rtt_ros2_zaber::stopHook(){
   std::cout << "stopHook" << std::endl;
   axis.stop(); 
 }
-void rtt_zaber::cleanupHook(){
+void rtt_ros2_zaber::cleanupHook(){
   std::cout << "cleanupHook" << std::endl;
   axis.home();
 }
 
-void rtt_zaber::home()
+void rtt_ros2_zaber::home()
 {
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
@@ -127,7 +127,7 @@ void rtt_zaber::home()
   }
 }
 
-void rtt_zaber::move_relatvie(const double& distance, const double& velocity)
+void rtt_ros2_zaber::move_relatvie(const double& distance, const double& velocity)
 {
   // std::cout << distance << std::endl;
   if (axis.isBusy()){
@@ -138,7 +138,7 @@ void rtt_zaber::move_relatvie(const double& distance, const double& velocity)
   }
 }
 
-void rtt_zaber::move_absolute(const double& distance, const double& velocity)
+void rtt_ros2_zaber::move_absolute(const double& distance, const double& velocity)
 {
   // std::cout << distance << std::endl;
   if (axis.isBusy()){
@@ -149,7 +149,7 @@ void rtt_zaber::move_absolute(const double& distance, const double& velocity)
   }
 }
 
-void rtt_zaber::move_velocity(const double& velocity)
+void rtt_ros2_zaber::move_velocity(const double& velocity)
 {
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
@@ -159,11 +159,11 @@ void rtt_zaber::move_velocity(const double& velocity)
   }
 }
 
-void rtt_zaber::stop_axis(){
+void rtt_ros2_zaber::stop_axis(){
   axis.stop(false);
 }
 
-void rtt_zaber::move_max(const double& velocity)
+void rtt_ros2_zaber::move_max(const double& velocity)
 {
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
@@ -173,7 +173,7 @@ void rtt_zaber::move_max(const double& velocity)
   }
 }
 
-void rtt_zaber::move_min(const double& velocity)
+void rtt_ros2_zaber::move_min(const double& velocity)
 {
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
@@ -183,13 +183,13 @@ void rtt_zaber::move_min(const double& velocity)
   }
 }
 
-void rtt_zaber::teleop_start()
+void rtt_ros2_zaber::teleop_start()
 {
   teleop_status = true ;
   std::cout << "Teleop control Activated!" << std::endl;
 }
 
-void rtt_zaber::teleop_stop()
+void rtt_ros2_zaber::teleop_stop()
 {
   teleop_status = false; 
   std::cout << "Teleop control Deactivated!" << std::endl;
@@ -197,4 +197,4 @@ void rtt_zaber::teleop_stop()
 }
 
 
-ORO_CREATE_COMPONENT(rtt_zaber)
+ORO_CREATE_COMPONENT(rtt_ros2_zaber)
