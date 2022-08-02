@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(rtt_zaber)
+project(rtt_ros2_zaber)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -41,8 +41,8 @@ include_directories(
   include 
 )
 
-orocos_component(rtt_zaber src/rtt_zaber.cpp)
-target_link_libraries(rtt_zaber
+orocos_component(rtt_ros2_zaber src/rtt_ros2_zaber.cpp)
+target_link_libraries(rtt_ros2_zaber
   rtt_ros2::rtt_ros2
   rtt_ros2_node::rtt_ros2_node
   # rtt_std_msgs_typekit
