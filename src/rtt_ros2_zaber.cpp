@@ -10,17 +10,14 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
   // port_emergency_stop( "emergency_stop" )
 {
 
-  RTT::Service::shared_ptr global_ros =
-    RTT::internal::GlobalService::Instance()->getService("ros");
-  RTT::OperationCaller<bool()> create_node =
-    global_ros->getOperation("create_node");
+  global_ros = RTT::internal::GlobalService::Instance()->getService("ros");
+  RTT::OperationCaller<bool(const std::string&)> create_node = global_ros->getOperation("create_named_node");
   create_node.ready();
-  create_node();
+  create_node(name);
 
-  // std::cout << "Time: " << global_ros::Clock::now(); std::endl;
-  
   addPort("wrench", port_input_wrench );
   addPort("teleop_control",port_input_teleop);
+  addPort("joint_state", port_output_jointstate);
   // addPort("emergency_stop", port_emergency_stop);
 
   addOperation("Home", &rtt_ros2_zaber::home, this, RTT::OwnThread);
@@ -32,6 +29,7 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
   addOperation("MoveMin", &rtt_ros2_zaber::move_min, this, RTT::OwnThread);
   addOperation("TeleopStart", &rtt_ros2_zaber::teleop_start, this, RTT::OwnThread);
   addOperation("TeleopStop", &rtt_ros2_zaber::teleop_stop, this, RTT::OwnThread);
+  addOperation("GetPosition", &rtt_ros2_zaber::get_position, this, RTT::OwnThread);
   
   addProperty("zaber_axis", zaber_axis);
 
@@ -40,7 +38,6 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
 }
 
 bool rtt_ros2_zaber::configureHook(){
-  std::cout << "configureHook_1" << std::endl;
 
   connection = Connection::openSerialPort("/dev/ttyUSB1");
 
@@ -56,10 +53,7 @@ bool rtt_ros2_zaber::configureHook(){
 }
 
 bool rtt_ros2_zaber::startHook(){
-  std::cout << "startupHook" << std::endl;
-  std::cout << "Zaber Axis: " << zaber_axis << std::endl;
   // old_time = rclcpp::Clock::Clock::now();
-  std::cout << "Time: " << old_time << std::endl;
   return true;
 }
 
@@ -75,7 +69,18 @@ void rtt_ros2_zaber::updateHook(){
     }
         
   }
-  
+
+  double q = get_position();
+  double qd = 0.0;
+  std::string name("Y");
+  sensor_msgs::msg::JointState js;
+  js.name.push_back(name);
+  js.position.push_back(q);
+  js.velocity.push_back(qd);
+
+  rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
+  js.header.stamp = node->now();
+  port_output_jointstate.write(js);
   // geometry_msgs::msg::Twist teleop_cmd;
     
   // if(port_input_teleop.read(teleop_cmd) == RTT::NewData){
@@ -109,13 +114,14 @@ void rtt_ros2_zaber::updateHook(){
 }
 
 void rtt_ros2_zaber::stopHook(){
-  std::cout << "stopHook" << std::endl;
   axis.stop(); 
 }
 void rtt_ros2_zaber::cleanupHook(){
-  std::cout << "cleanupHook" << std::endl;
   axis.home();
 }
+
+double rtt_ros2_zaber::get_position()
+{ return axis.getPosition(Units::LENGTH_MILLIMETRES); }
 
 void rtt_ros2_zaber::home()
 {

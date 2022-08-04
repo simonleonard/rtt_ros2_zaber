@@ -18,7 +18,8 @@ private:
 
   RTT::InputPort<geometry_msgs::msg::WrenchStamped> port_input_wrench;
   RTT::InputPort<geometry_msgs::msg::Twist> port_input_teleop;
-  // RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointstate; 
+  RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointstate;
+
   // RTT::InputPort<std_msgs::msg::Bool> port_emergency_stop; 
   double old_time = 0; 
   double new_time = 0; 
@@ -32,6 +33,9 @@ private:
   Axis axis;
   Device device;
   Connection connection;
+
+  RTT::Service::shared_ptr global_ros;
+  
 public:
 
   rtt_ros2_zaber( const std::string& name );
@@ -44,6 +48,7 @@ public:
   virtual void stopHook();
   virtual void cleanupHook();
 
+  double get_position();
   void move_relatvie(const double& distance, const double& velocity);
   void home(); 
   void move_absolute(const double& distance, const double& velocity);
