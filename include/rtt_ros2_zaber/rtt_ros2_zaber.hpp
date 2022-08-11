@@ -6,7 +6,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
-
+#include <typeinfo>
 #include <zaber/motion/ascii.h>
 using namespace zaber::motion;
 using namespace zaber::motion::ascii;
@@ -21,11 +21,14 @@ private:
   RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointstate;
 
   // RTT::InputPort<std_msgs::msg::Bool> port_emergency_stop; 
-  double old_time = 0; 
-  double new_time = 0; 
+
+
+  long int sensor_time; 
+  long int update_time; 
+  long int old_time;
   double teleop_status = false; 
   double teleop_vel = 0.0;
-
+  double old_position = 0;
   // auto nh = rclcpp::Node; 
 
   int zaber_axis = 0;

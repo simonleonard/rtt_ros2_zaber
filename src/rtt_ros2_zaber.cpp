@@ -39,7 +39,7 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
 
 bool rtt_ros2_zaber::configureHook(){
 
-  connection = Connection::openSerialPort("/dev/ttyUSB1");
+  connection = Connection::openSerialPort("/dev/ttyUSB0");
 
   std::vector<Device> deviceList = connection.detectDevices();
   std::cout << "Found " << deviceList.size() << " devices." << std::endl;
@@ -53,15 +53,29 @@ bool rtt_ros2_zaber::configureHook(){
 }
 
 bool rtt_ros2_zaber::startHook(){
-  // old_time = rclcpp::Clock::Clock::now();
+  rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
+  old_position = get_position();
+  old_time = node->now().nanoseconds();
+  sensor_time = node->now().nanoseconds();
   return true;
 }
 
 void rtt_ros2_zaber::updateHook(){
-  geometry_msgs::msg::WrenchStamped wrench;
 
+  rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
+  // std::cout << typeid(node->now().nanoseconds()).name() << std::endl;
+  update_time = node->now().nanoseconds(); 
+  double q = get_position();
+  double qd = (q - old_position) / (update_time - old_time);
+
+  std::cout << "Velocity: " << qd << std::endl;
+  old_position = q;
+  old_time = update_time;
+
+  geometry_msgs::msg::WrenchStamped wrench;
   if( port_input_wrench.read( wrench ) == RTT::NewData ){
-    std::cout << wrench.header.stamp.nanosec << std::endl;
+    // std::cout << wrench.header.stamp.nanosec << std::endl;
+    sensor_time = wrench.header.stamp.nanosec;
 
     if (wrench.wrench.force.z  > 5.0 ){
       axis.stop();
@@ -70,16 +84,23 @@ void rtt_ros2_zaber::updateHook(){
         
   }
 
-  double q = get_position();
-  double qd = 0.0;
+  if ((update_time - sensor_time) > 0.02*pow(10,9)){
+    axis.stop();
+    throw std::invalid_argument("More than 0.02 sec delay between sensor data time stamp and update loop time stamp");
+  }
+
+  // double q = get_position();
+  // double qd = 0;
   std::string name("Y");
   sensor_msgs::msg::JointState js;
   js.name.push_back(name);
   js.position.push_back(q);
   js.velocity.push_back(qd);
 
-  rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
+  
   js.header.stamp = node->now();
+  // std::cout << "Time: " << js.header.stamp.nanosec << std::endl;
+  // std::cout << axis.getState() << std::endl;
   port_output_jointstate.write(js);
   // geometry_msgs::msg::Twist teleop_cmd;
     
