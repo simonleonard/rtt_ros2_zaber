@@ -66,16 +66,16 @@ void rtt_ros2_zaber::updateHook(){
   // std::cout << typeid(node->now().nanoseconds()).name() << std::endl;
   update_time = node->now().nanoseconds(); 
   double q = get_position();
-  double qd = (q - old_position) / (update_time - old_time);
+  double qd = (q - old_position) * (pow(10,6)) / (update_time - old_time);
 
-  std::cout << "Velocity: " << qd << std::endl;
+  // std::cout << "Velocity: " << qd << "m/sec" << std::endl;
   old_position = q;
   old_time = update_time;
 
   geometry_msgs::msg::WrenchStamped wrench;
   if( port_input_wrench.read( wrench ) == RTT::NewData ){
     // std::cout << wrench.header.stamp.nanosec << std::endl;
-    sensor_time = wrench.header.stamp.nanosec;
+    sensor_time = wrench.header.stamp.sec * pow(10,9) + wrench.header.stamp.nanosec;
 
     if (wrench.wrench.force.z  > 5.0 ){
       axis.stop();
@@ -84,7 +84,13 @@ void rtt_ros2_zaber::updateHook(){
         
   }
 
-  if ((update_time - sensor_time) > 0.02*pow(10,9)){
+  // std::cout << "Update loop time: " << update_time << std::endl;
+  // std::cout << "Sensor time: " << sensor_time << std::endl;
+  // std::cout << "Sensor time: " << wrench.header.stamp.sec << std::endl;
+  // std::cout << "Diff: " << (update_time - sensor_time)/(pow(10,9)) << std::endl;
+  // std::cout << "Threshold: " << (0.02 * pow(10,9)) << std::endl;
+
+  if ((update_time - sensor_time) > 0.05*pow(10,9)){
     axis.stop();
     throw std::invalid_argument("More than 0.02 sec delay between sensor data time stamp and update loop time stamp");
   }
