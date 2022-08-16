@@ -32,6 +32,7 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
   addOperation("GetPosition", &rtt_ros2_zaber::get_position, this, RTT::OwnThread);
   
   addProperty("zaber_axis", zaber_axis);
+  addProperty("device_file", device_file);
 
   Library::enableDeviceDbStore();
   
@@ -39,7 +40,7 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
 
 bool rtt_ros2_zaber::configureHook(){
 
-  connection = Connection::openSerialPort("/dev/ttyUSB0");
+  connection = Connection::openSerialPort(device_file);
 
   std::vector<Device> deviceList = connection.detectDevices();
   std::cout << "Found " << deviceList.size() << " devices." << std::endl;
@@ -92,7 +93,7 @@ void rtt_ros2_zaber::updateHook(){
 
   if ((update_time - sensor_time) > 0.05*pow(10,9)){
     axis.stop();
-    throw std::invalid_argument("More than 0.02 sec delay between sensor data time stamp and update loop time stamp");
+    throw std::invalid_argument("More than 0.05 sec delay between sensor data time stamp and update loop time stamp");
   }
 
   // double q = get_position();

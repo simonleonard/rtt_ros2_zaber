@@ -16,6 +16,6 @@ stream("zaber.joint_state", ros.topic("/joint_state",false))
 # stream("zaber.emergency_stop", ros.topic("/emergency_stop", false)  )
 
 zaber.zaber_axis = 1
-
+zaber.device_file = "/dev/ttyUSB0"
 zaber.configure()
 zaber.start()

@@ -16,13 +16,14 @@ class rtt_ros2_zaber : public RTT::TaskContext{
 
 private:
 
+  // RTT input and output ports 
   RTT::InputPort<geometry_msgs::msg::WrenchStamped> port_input_wrench;
   RTT::InputPort<geometry_msgs::msg::Twist> port_input_teleop;
   RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointstate;
-
+  RTT::Service::shared_ptr global_ros;
   // RTT::InputPort<std_msgs::msg::Bool> port_emergency_stop; 
 
-
+  
   long int sensor_time; 
   long int update_time; 
   long int old_time;
@@ -32,12 +33,13 @@ private:
   // auto nh = rclcpp::Node; 
 
   int zaber_axis = 0;
+  std::string device_file;
 
   Axis axis;
   Device device;
   Connection connection;
 
-  RTT::Service::shared_ptr global_ros;
+  
   
 public:
 
@@ -45,9 +47,7 @@ public:
 
   virtual bool configureHook();
   virtual bool startHook();
-
   virtual void updateHook();
-
   virtual void stopHook();
   virtual void cleanupHook();
 
