@@ -17,5 +17,6 @@ stream("zaber.joint_state", ros.topic("/joint_state",false))
 
 zaber.zaber_axis = 1
 zaber.device_file = "/dev/ttyUSB0"
+zaber.home_position = 20
 zaber.configure()
 zaber.start()

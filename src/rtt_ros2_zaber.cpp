@@ -33,6 +33,7 @@ rtt_ros2_zaber::rtt_ros2_zaber( const std::string& name ) :
   
   addProperty("zaber_axis", zaber_axis);
   addProperty("device_file", device_file);
+  addProperty("home_position", home_position);
 
   Library::enableDeviceDbStore();
   
@@ -48,7 +49,7 @@ bool rtt_ros2_zaber::configureHook(){
   device = deviceList[0];
 
   axis = device.getAxis(1);
-  axis.home();
+  axis.moveAbsolute(home_position, Units::LENGTH_MILLIMETRES, true, 10, Units::VELOCITY_MILLIMETRES_PER_SECOND);
 
   return true;
 }
@@ -64,40 +65,38 @@ bool rtt_ros2_zaber::startHook(){
 void rtt_ros2_zaber::updateHook(){
 
   rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
-  // std::cout << typeid(node->now().nanoseconds()).name() << std::endl;
   update_time = node->now().nanoseconds(); 
   double q = get_position();
   double qd = (q - old_position) * (pow(10,6)) / (update_time - old_time);
 
-  // std::cout << "Velocity: " << qd << "m/sec" << std::endl;
   old_position = q;
   old_time = update_time;
 
   geometry_msgs::msg::WrenchStamped wrench;
   if( port_input_wrench.read( wrench ) == RTT::NewData ){
-    // std::cout << wrench.header.stamp.nanosec << std::endl;
     sensor_time = wrench.header.stamp.sec * pow(10,9) + wrench.header.stamp.nanosec;
 
-    if (wrench.wrench.force.z  > 5.0 ){
+    if (wrench.wrench.force.y  > 6.0 ){
       axis.stop();
-      throw std::invalid_argument("Force exceeded over the limit of 5N");
+      throw std::invalid_argument("Y-axis Force exceeded over the limit of 6N");
+    }
+    else if (wrench.wrench.force.x  > 6.0 ){
+      axis.stop();
+      throw std::invalid_argument("X-axis Force exceeded over the limit of 6N");
+    }
+    else if (wrench.wrench.force.z  > 8.0 ){
+      axis.stop();
+      throw std::invalid_argument("Z-axis Force exceeded over the limit of 8N");
     }
         
   }
-
-  // std::cout << "Update loop time: " << update_time << std::endl;
-  // std::cout << "Sensor time: " << sensor_time << std::endl;
-  // std::cout << "Sensor time: " << wrench.header.stamp.sec << std::endl;
-  // std::cout << "Diff: " << (update_time - sensor_time)/(pow(10,9)) << std::endl;
-  // std::cout << "Threshold: " << (0.02 * pow(10,9)) << std::endl;
 
   if ((update_time - sensor_time) > 0.05*pow(10,9)){
     axis.stop();
     throw std::invalid_argument("More than 0.05 sec delay between sensor data time stamp and update loop time stamp");
   }
 
-  // double q = get_position();
-  // double qd = 0;
+
   std::string name("Y");
   sensor_msgs::msg::JointState js;
   js.name.push_back(name);
@@ -106,14 +105,12 @@ void rtt_ros2_zaber::updateHook(){
 
   
   js.header.stamp = node->now();
-  // std::cout << "Time: " << js.header.stamp.nanosec << std::endl;
-  // std::cout << axis.getState() << std::endl;
   port_output_jointstate.write(js);
-  // geometry_msgs::msg::Twist teleop_cmd;
-    
-  // if(port_input_teleop.read(teleop_cmd) == RTT::NewData){
-  //   std::cout << "Teleop input: " << teleop_cmd.linear.x << std::endl;
-  // }
+ 
+
+  if (axis.getPosition(Units::LENGTH_MILLIMETRES) < home_position){
+    axis.stop(false);
+  }
 
   if (teleop_status)
   {
@@ -133,7 +130,12 @@ void rtt_ros2_zaber::updateHook(){
           throw std::invalid_argument("Zaber axis out of bound!");
         }
 
-        axis.moveVelocity(((50*teleop_vel)), Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        if (axis.getPosition(Units::LENGTH_MILLIMETRES) > home_position){
+          axis.moveVelocity(((50*teleop_vel)), Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        }
+        else {
+          axis.moveVelocity(0, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        }
       }
       else {
         axis.moveVelocity(0, Units::VELOCITY_MILLIMETRES_PER_SECOND);
@@ -145,11 +147,13 @@ void rtt_ros2_zaber::stopHook(){
   axis.stop(); 
 }
 void rtt_ros2_zaber::cleanupHook(){
-  axis.home();
+  axis.moveAbsolute(home_position, Units::LENGTH_MILLIMETRES, true, 10, Units::VELOCITY_MILLIMETRES_PER_SECOND);
 }
 
 double rtt_ros2_zaber::get_position()
-{ return axis.getPosition(Units::LENGTH_MILLIMETRES); }
+{ 
+  return axis.getPosition(Units::LENGTH_MILLIMETRES); 
+}
 
 void rtt_ros2_zaber::home()
 {
@@ -157,7 +161,7 @@ void rtt_ros2_zaber::home()
     throw std::invalid_argument("Device is busy, cannot recieve new command");
   }
   else{
-    axis.home(false); 
+    axis.moveAbsolute(home_position, Units::LENGTH_MILLIMETRES, false, 10, Units::VELOCITY_MILLIMETRES_PER_SECOND); 
   }
 }
 
@@ -166,6 +170,9 @@ void rtt_ros2_zaber::move_relatvie(const double& distance, const double& velocit
   // std::cout << distance << std::endl;
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
+  }
+  else if ((axis.getPosition(Units::LENGTH_MILLIMETRES) + distance) < home_position){
+    throw std::invalid_argument("Device cannot recede beyond the 20mm initial position");
   }
   else{
     axis.moveRelative(distance, Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
@@ -177,6 +184,9 @@ void rtt_ros2_zaber::move_absolute(const double& distance, const double& velocit
   // std::cout << distance << std::endl;
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
+  }
+  else if (distance < home_position){
+    throw std::invalid_argument("Device cannot recede beyond the 20mm initial position");
   }
   else{
     axis.moveAbsolute(distance, Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
@@ -211,6 +221,9 @@ void rtt_ros2_zaber::move_min(const double& velocity)
 {
   if (axis.isBusy()){
     throw std::invalid_argument("Device is busy, cannot recieve new command");
+  }
+  else if (home_position != 0){
+    throw std::invalid_argument("MoveMin can only be used when home position is zero");
   }
   else{
     axis.moveMin(false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);

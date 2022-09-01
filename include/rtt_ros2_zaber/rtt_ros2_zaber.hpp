@@ -34,6 +34,7 @@ private:
 
   int zaber_axis = 0;
   std::string device_file;
+  float home_position = 0; 
 
   Axis axis;
   Device device;
