@@ -8,6 +8,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <typeinfo>
 #include <zaber/motion/ascii.h>
+#include <fstream>
 using namespace zaber::motion;
 using namespace zaber::motion::ascii;
 
@@ -19,7 +20,7 @@ private:
   // RTT input and output ports 
   RTT::InputPort<geometry_msgs::msg::WrenchStamped> port_input_wrench;
   RTT::InputPort<geometry_msgs::msg::Twist> port_input_teleop;
-  RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointstate;
+  RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointState;
   RTT::Service::shared_ptr global_ros;
   // RTT::InputPort<std_msgs::msg::Bool> port_emergency_stop; 
 
