@@ -78,7 +78,7 @@ void rtt_ros2_zaber2::updateHook(){
 
     rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
     this->updateTime = node->now().nanoseconds(); 
-    
+
     double qLS = this->getPositionLS(); 
     double qTX = this->getPositionTX();
     double qTZ = this->getPositionTZ(); 
@@ -132,6 +132,7 @@ void rtt_ros2_zaber2::updateHook(){
 
         }
     }
+ 
 }
 
 void rtt_ros2_zaber2::stopHook() {
