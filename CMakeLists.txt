@@ -50,11 +50,5 @@ target_link_libraries(rtt_ros2_zaber
   # rclcpp
 )
 
-orocos_component(rtt_ros2_zaber2 src/rtt_ros2_zaber2.cpp)
-target_link_libraries(rtt_ros2_zaber2
-  rtt_ros2::rtt_ros2
-  rtt_ros2_node::rtt_ros2_node
-  zml
-)
 
 orocos_generate_package()

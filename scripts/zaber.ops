@@ -10,13 +10,9 @@ import("rtt_ros2_zaber")
 loadComponent("zaber", "rtt_ros2_zaber" )
 setActivity("zaber", 0.01, 0, ORO_SCHED_OTHER)
 
-stream("zaber.wrench", ros.topic("/ati_raw", false)  )
-stream("zaber.teleop_control", ros.topic("/spacenav/twist",false))
-stream("zaber.joint_state", ros.topic("/joint_state",false))
-# stream("zaber.emergency_stop", ros.topic("/emergency_stop", false)  )
+stream("zaber.joint_state", ros.topic("/joint_state", false))
+stream("zaber.set_joint_state", ros.topic("/set_joint_state", false))
+stream("zaber.teleop_control", ros.topic("/spacenav/twist", false))
 
-zaber.zaber_axis = 1
-zaber.device_file = "/dev/ttyUSB1"
-zaber.home_position = 20
-zaber.configure()
-zaber.start()
+zaber.configure() 
+zaber.start() 

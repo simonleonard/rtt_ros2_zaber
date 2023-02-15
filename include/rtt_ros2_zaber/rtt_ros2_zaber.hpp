@@ -8,59 +8,87 @@
 #include <std_msgs/msg/bool.hpp>
 #include <typeinfo>
 #include <zaber/motion/ascii.h>
-#include <fstream>
 using namespace zaber::motion;
 using namespace zaber::motion::ascii;
 
+class rtt_ros2_zaber : public RTT::TaskContext {
+public: 
 
-class rtt_ros2_zaber : public RTT::TaskContext{
+    rtt_ros2_zaber(const std::string& name);
 
-private:
+    bool configureHook() override; 
+    bool startHook() override; 
+    void updateHook() override; 
+    void stopHook() override; 
+    void cleanupHook() override; 
 
-  // RTT input and output ports 
-  RTT::InputPort<geometry_msgs::msg::WrenchStamped> port_input_wrench;
-  RTT::InputPort<geometry_msgs::msg::Twist> port_input_teleop;
-  RTT::OutputPort<sensor_msgs::msg::JointState> port_output_jointState;
-  RTT::Service::shared_ptr global_ros;
-  // RTT::InputPort<std_msgs::msg::Bool> port_emergency_stop; 
+    double getPositionLS(); 
+    double getPositionTX(); 
+    double getPositionTZ(); 
+    void HomeLS(); 
+    void HomeTX(); 
+    void HomeTZ();
+    void MoveRelativeLS(const double& distance, const double& velocity);
+    void MoveRelativeTX(const double& distance, const double& velocity);
+    void MoveRelativeTZ(const double& distance, const double& velocity);
+    void MoveAbsoluteLS(const double& pose, const double& velocity);
+    void MoveAbsoluteTX(const double& pose, const double& velocity);
+    void MoveAbsoluteTZ(const double& pose, const double& velocity);
+    void MoveVelocityLS(const double& velocity);
+    void MoveVelocityTX(const double& velocity);
+    void MoveVelocityTZ(const double& velocity);
+    void StopLS();
+    void StopTX();
+    void StopTZ();
+    void Stop(); 
+    void StartTopicControl(); 
+    void StopTopicControl(); 
+    void StartTeleopControl(); 
+    void StopTeleopControl(); 
+    void StartTeleopXZControl(const double& velocity); 
+    void StopTeleopXZControl(); 
 
-  
-  long int sensor_time; 
-  long int update_time; 
-  long int old_time;
-  double teleop_status = false; 
-  double teleop_vel = 0.0;
-  double old_position = 0;
-  // auto nh = rclcpp::Node; 
 
-  int zaber_axis = 0;
-  std::string device_file;
-  float home_position = 0; 
+private: 
 
-  Axis axis;
-  Device device;
-  Connection connection;
+    RTT::Service::shared_ptr global_ros; 
 
-  
-  
-public:
+    Axis linearStage; 
+    Axis templateX; 
+    Axis templateZ; 
 
-  rtt_ros2_zaber( const std::string& name );
+    Device deviceLS;
+    Device deviceTX; 
+    Device deviceTZ;  
+    Connection connection; 
 
-  virtual bool configureHook();
-  virtual bool startHook();
-  virtual void updateHook();
-  virtual void stopHook();
-  virtual void cleanupHook();
+    double templateX_home = 12.5;
+    double templateX_lower_limit = 7.5; 
+    double templateX_upper_limit = 17.5; 
 
-  double get_position();
-  void move_relatvie(const double& distance, const double& velocity);
-  void home(); 
-  void move_absolute(const double& distance, const double& velocity);
-  void move_velocity(const double& velocity);
-  void stop_axis();
-  void move_max(const double& velocity);
-  void move_min(const double& velocity);
-  void teleop_start();
-  void teleop_stop(); 
+    double templateZ_home = 10; 
+    double templateZ_lower_limit = 5; 
+    double templateZ_upper_limit = 15; 
+    
+    double linearStage_home = 20; 
+    double linearStage_lower_limit = 20; 
+    double linearStage_upper_limit = 120; 
+
+    RTT::InputPort<sensor_msgs::msg::JointState> portSetJointState; 
+    RTT::OutputPort<sensor_msgs::msg::JointState> portGetJointState;
+    RTT::InputPort<geometry_msgs::msg::Twist> portSetTeleop; 
+
+    bool topic_control = false;
+    bool teleop_control = false;  
+    bool teleop_controlXZ = false; 
+
+    long int updateTime; 
+    long int oldTime; 
+
+    double oldPoseLS; 
+    double oldPoseTX; 
+    double oldPoseTZ; 
+
+    double linearStageVel = 1.0; 
+
 };
