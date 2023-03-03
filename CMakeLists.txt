@@ -57,7 +57,7 @@ target_link_libraries(rtt_ros2_zaber2
   zml
 )
 
-orocos_component(rtt_ros2_zaber2 src/rtt_ros2_zaber_auto_insertion.cpp)
+orocos_component(rtt_ros2_zaber_auto_insertion src/rtt_ros2_zaber_auto_insertion.cpp)
 target_link_libraries(rtt_ros2_zaber_auto_insertion
   rtt_ros2::rtt_ros2
   rtt_ros2_node::rtt_ros2_node

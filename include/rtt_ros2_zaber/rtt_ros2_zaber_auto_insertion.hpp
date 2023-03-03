@@ -18,14 +18,16 @@ using namespace zaber::motion::ascii;
 struct Command{
     Command(const std::string& line){
         std::istringstream ss(line);
-        ss >> joint >> start_time >> target >> velocity;
+        double start_time_s;
+        ss >> joint >> start_time_s >> target >> velocity;
+        start_time = start_time_s * 1000000000;
     }
 
     std::string joint;
     long start_time;
     double target;
     double velocity;
-}
+};
 
 class rtt_ros2_zaber_auto_insertion : public RTT::TaskContext {
 public: 
@@ -38,7 +40,12 @@ public:
     void stopHook() override; 
     void cleanupHook() override; 
 
+    double getPositionLS(); 
+    double getPositionTX(); 
+    double getPositionTZ(); 
+
     void autoInsertion(const std::string& file);
+    void home();
 
 private: 
     sensor_msgs::msg::JointState getCurrentJointState();

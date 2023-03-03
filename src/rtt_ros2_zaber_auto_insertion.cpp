@@ -4,6 +4,7 @@
 #include <rtt/internal/GlobalService.hpp>
 
 #include <rtt/Component.hpp>
+#include <limits>
 
 constexpr double TX_HOME = 12.5;
 constexpr double templateX_lower_limit = 7.5; 
@@ -17,15 +18,12 @@ constexpr double LS_HOME = 20.0;
 constexpr double linearStage_lower_limit = 20.0; 
 constexpr double linearStage_upper_limit = 120.0; 
 
-constexpr double default_speed = 5.0 /* mm /s */
-
-using LenUnit = Units::LENGTH_MILLIMETRES;
-using VelUnit = Units::VELOCITY_MILLIMETRES_PER_SECOND;
+constexpr double default_speed = 5.0; /* mm /s */
 
 rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& name):
     RTT::TaskContext(name),
     portSetJointState("set_joint_state"),
-    insertion_start_time(0)
+    insertion_start_time(std::numeric_limits<long>::max() / 2)
 {
     global_ros = RTT::internal::GlobalService::Instance()->getService("ros");
     RTT::OperationCaller<bool(const std::string&)> create_node = global_ros->getOperation("create_named_node");
@@ -35,7 +33,8 @@ rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& 
     addPort("set_joint_state", portSetJointState);
     addPort("joint_state", portGetJointState);
 
-    sethome();
+    addOperation("AutoInsertion", &rtt_ros2_zaber_auto_insertion::autoInsertion, this, RTT::OwnThread);
+    addOperation("Home", &rtt_ros2_zaber_auto_insertion::home, this, RTT::OwnThread);
 
     Library::enableDeviceDbStore(); 
 }
@@ -55,6 +54,7 @@ bool rtt_ros2_zaber_auto_insertion::configureHook(){
     templateX = deviceTX.getAxis(1);
     templateZ = deviceTZ.getAxis(1);
 
+    setHome();
 
     return true; 
 }
@@ -81,13 +81,15 @@ void rtt_ros2_zaber_auto_insertion::updateHook(){
     while(!insert_cmds.empty() && curr_time >= insert_cmds.front().start_time + insertion_start_time){
         const auto cmd = insert_cmds.front();
         insert_cmds.pop();
-
+        std::cout << cmd.joint << std::endl;
         if(cmd.joint == "LS"){
-            linearStage.moveAbsolute((cmd.target + LS_HOME), LenUnit, false, cmd.velocity, VelUnit);
+            linearStage.moveAbsolute((cmd.target + LS_HOME), Units::LENGTH_MILLIMETRES, false, cmd.velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
         }else if(cmd.joint == "TX"){
-            templateX.moveAbsolute((cmd.target + LS_HOME), LenUnit, false, cmd.velocity, VelUnit);
+            templateX.moveAbsolute((cmd.target + TX_HOME), Units::LENGTH_MILLIMETRES, false, cmd.velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
         }else if (cmd.joint == "TZ"){
-            templateZ.moveAbsolute((cmd.target + LS_HOME), LenUnit, false, cmd.velocity, VelUnit);
+            templateZ.moveAbsolute((cmd.target + TZ_HOME), Units::LENGTH_MILLIMETRES, false, cmd.velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        }else if(cmd.joint == "END"){
+            insertion_start_time = std::numeric_limits<long>::max() / 2;
         }
     }
 }
@@ -100,18 +102,37 @@ void rtt_ros2_zaber_auto_insertion::cleanupHook() {
     setHome();
 }
 
+double rtt_ros2_zaber_auto_insertion::getPositionLS() {
+    return linearStage.getPosition(Units::LENGTH_MILLIMETRES) - LS_HOME;
+}
+
+double rtt_ros2_zaber_auto_insertion::getPositionTX() {
+    return templateX.getPosition(Units::LENGTH_MILLIMETRES) - TX_HOME; 
+}
+
+double rtt_ros2_zaber_auto_insertion::getPositionTZ() {
+    return templateZ.getPosition(Units::LENGTH_MILLIMETRES) - TZ_HOME; 
+}
+
 void rtt_ros2_zaber_auto_insertion::autoInsertion(const std::string& file){
     std::ifstream infile(file);
 
-    insertion_start_time = getCurrentTime(); 
-
     std::string line;
     while(std::getline(infile, line)){
-        insert_cmds.push(Command(line));
+        Command cmd(line);
+        insert_cmds.push(cmd); 
+        std::cout << cmd.joint << " " << cmd.start_time << " " << cmd.target << " " << cmd.velocity << std::endl;
     }
+
+    insertion_start_time = getCurrentTime(); 
+}
+
+void rtt_ros2_zaber_auto_insertion::home(){
+    setHome();
 }
 
 sensor_msgs::msg::JointState rtt_ros2_zaber_auto_insertion::getCurrentJointState() {
+    
     const long updateTime = getCurrentTime(); 
 
     const double qLS = getPositionLS(); 
@@ -142,18 +163,19 @@ sensor_msgs::msg::JointState rtt_ros2_zaber_auto_insertion::getCurrentJointState
     js.position.push_back(qTZ);
     js.velocity.push_back(qdTZ);
 
-    js.header.stamp = node->now(); 
+    js.header.stamp = rtt_ros2_node::getNode(this)->now(); 
 
     return js;
 }
 
 void rtt_ros2_zaber_auto_insertion::setHome(){
-    templateX.moveAbsolute(TX_HOME, LenUnit, true /* waitUntilIdle */, default_speed, VelUnit);
-    templateZ.moveAbsolute(TZ_HOME, LenUnit, true /* waitUntilIdle */, default_speed, VelUnit);
-    linearStage.moveAbsolute(LS_HOME, LenUnit, true /* waitUntilIdle */, default_speed, VelUnit);
+    templateX.moveAbsolute(TX_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    templateZ.moveAbsolute(TZ_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    linearStage.moveAbsolute(LS_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
 }
 
 long rtt_ros2_zaber_auto_insertion::getCurrentTime(){
     return rtt_ros2_node::getNode(this)->now().nanoseconds(); 
 }
 
+ORO_CREATE_COMPONENT(rtt_ros2_zaber_auto_insertion)
