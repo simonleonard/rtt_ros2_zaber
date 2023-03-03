@@ -10,6 +10,9 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+
 #include <typeinfo>
 #include <zaber/motion/ascii.h>
 using namespace zaber::motion;
@@ -63,7 +66,6 @@ private:
     Device deviceTZ;  
     Connection connection; 
 
-
     RTT::InputPort<sensor_msgs::msg::JointState> portSetJointState; 
     RTT::OutputPort<sensor_msgs::msg::JointState> portGetJointState;
 
@@ -75,5 +77,8 @@ private:
     double oldPoseLS; 
     double oldPoseTX; 
     double oldPoseTZ; 
+
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
 };

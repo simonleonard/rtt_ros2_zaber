@@ -22,6 +22,10 @@ find_package(rtt_ros2_node REQUIRED)
 find_package(rtt_ros2_geometry_msgs REQUIRED)
 find_package(rtt_ros2_sensor_msgs REQUIRED)
 find_package(rtt_ros2_std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+
 # find_package(rclcpp REQUIRED)
 
 if(BUILD_TESTING)
@@ -62,6 +66,12 @@ target_link_libraries(rtt_ros2_zaber_auto_insertion
   rtt_ros2::rtt_ros2
   rtt_ros2_node::rtt_ros2_node
   zml
+)
+
+ament_target_dependencies(
+  rtt_ros2_zaber_auto_insertion
+  tf2
+  tf2_ros
 )
 
 orocos_generate_package()

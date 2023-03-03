@@ -36,6 +36,11 @@ rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& 
     addOperation("AutoInsertion", &rtt_ros2_zaber_auto_insertion::autoInsertion, this, RTT::OwnThread);
     addOperation("Home", &rtt_ros2_zaber_auto_insertion::home, this, RTT::OwnThread);
 
+    tf_buffer_ =
+      std::make_unique<tf2_ros::Buffer>(rtt_ros2_node::getNode(this)->get_clock());
+    tf_listener_ =
+      std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
     Library::enableDeviceDbStore(); 
 }
 
@@ -63,12 +68,11 @@ bool rtt_ros2_zaber_auto_insertion::startHook() {
 
     std::cout << "Started startHook" << std::endl;
 
-    rclcpp::Node::SharedPtr node = rtt_ros2_node::getNode(this);
     oldPoseLS = getPositionLS(); 
     oldPoseTX = getPositionTX(); 
     oldPoseTZ = getPositionTZ();
 
-    oldTime = node->now().nanoseconds(); 
+    oldTime = rtt_ros2_node::getNode(this)->now().nanoseconds(); 
 
     return true; 
 
@@ -76,6 +80,16 @@ bool rtt_ros2_zaber_auto_insertion::startHook() {
 
 void rtt_ros2_zaber_auto_insertion::updateHook(){
     portGetJointState.write(getCurrentJointState());
+
+    geometry_msgs::msg::TransformStamped t;
+    try {
+      t = tf_buffer_->lookupTransform("reference", "tip", tf2::TimePointZero);
+    //   std::cout << "x: " <<  t.transform.translation.x << " "
+                // << "y: " <<  t.transform.translation.y << " "
+                // << "z: " <<  t.transform.translation.z << std::endl;
+    } catch (const tf2::TransformException & ex) {
+        std::cout << "Could not transform reference to tip: " << ex.what() << std::endl;
+    }
 
     const long curr_time = getCurrentTime();
     while(!insert_cmds.empty() && curr_time >= insert_cmds.front().start_time + insertion_start_time){
