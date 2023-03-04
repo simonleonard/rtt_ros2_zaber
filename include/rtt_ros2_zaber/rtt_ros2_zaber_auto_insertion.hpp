@@ -15,6 +15,9 @@
 
 #include <typeinfo>
 #include <zaber/motion/ascii.h>
+
+#include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
+
 using namespace zaber::motion;
 using namespace zaber::motion::ascii;
 
@@ -51,7 +54,6 @@ public:
     void home();
 
 private: 
-    sensor_msgs::msg::JointState getCurrentJointState();
     void setHome();
     long getCurrentTime();
 
@@ -68,6 +70,7 @@ private:
 
     RTT::InputPort<sensor_msgs::msg::JointState> portSetJointState; 
     RTT::OutputPort<sensor_msgs::msg::JointState> portGetJointState;
+    RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint> portDemoPoint;
 
     long oldTime;
     

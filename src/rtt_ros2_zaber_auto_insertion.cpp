@@ -1,10 +1,11 @@
 #include <fstream>
 
-#include<rtt_ros2_zaber/rtt_ros2_zaber_auto_insertion.hpp>
+#include <rtt_ros2_zaber/rtt_ros2_zaber_auto_insertion.hpp>
 #include <rtt/internal/GlobalService.hpp>
 
 #include <rtt/Component.hpp>
 #include <limits>
+
 
 constexpr double TX_HOME = 12.5;
 constexpr double templateX_lower_limit = 7.5; 
@@ -32,12 +33,14 @@ rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& 
 
     addPort("set_joint_state", portSetJointState);
     addPort("joint_state", portGetJointState);
+    addPort("demo_point", portDemoPoint);
 
     addOperation("AutoInsertion", &rtt_ros2_zaber_auto_insertion::autoInsertion, this, RTT::OwnThread);
     addOperation("Home", &rtt_ros2_zaber_auto_insertion::home, this, RTT::OwnThread);
 
+    const auto node = rtt_ros2_node::getNode(this);
     tf_buffer_ =
-      std::make_unique<tf2_ros::Buffer>(rtt_ros2_node::getNode(this)->get_clock());
+      std::make_unique<tf2_ros::Buffer>(node->get_clock());
     tf_listener_ =
       std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
@@ -79,19 +82,59 @@ bool rtt_ros2_zaber_auto_insertion::startHook() {
 }
 
 void rtt_ros2_zaber_auto_insertion::updateHook(){
-    portGetJointState.write(getCurrentJointState());
+    const auto timestamp = rtt_ros2_node::getNode(this)->now();
+    const long curr_time = timestamp.nanoseconds();
+
+    const double qLS = getPositionLS();
+    const double qTX = getPositionTX();
+    const double qTZ = getPositionTZ();
+
+    const double qdLS = (qLS - oldPoseLS) * (pow(10,9)) / (curr_time - oldTime);
+    const double qdTX = (qTX - oldPoseTX) * (pow(10,9)) / (curr_time - oldTime);
+    const double qdTZ = (qTZ - oldPoseTZ) * (pow(10,9)) / (curr_time - oldTime);
+
+    oldPoseLS = qLS;
+    oldPoseTX = qTX;
+    oldPoseTZ = qTZ;
+
+    oldTime = curr_time;
+
+    sensor_msgs::msg::JointState js;
+
+    js.name.push_back("linearStage");
+    js.position.push_back(qLS);
+    js.velocity.push_back(qdLS);
+
+    js.name.push_back("templateX");
+    js.position.push_back(qTX);
+    js.velocity.push_back(qdTX);
+
+    js.name.push_back("templateZ");
+    js.position.push_back(qTZ);
+    js.velocity.push_back(qdTZ);
+
+    js.header.stamp = timestamp;
+    portGetJointState.write(js);
 
     geometry_msgs::msg::TransformStamped t;
     try {
-      t = tf_buffer_->lookupTransform("reference", "tip", tf2::TimePointZero);
-    //   std::cout << "x: " <<  t.transform.translation.x << " "
-                // << "y: " <<  t.transform.translation.y << " "
-                // << "z: " <<  t.transform.translation.z << std::endl;
+        t = tf_buffer_->lookupTransform("reference", "tip", tf2_ros::fromRclcpp(timestamp));
     } catch (const tf2::TransformException & ex) {
         std::cout << "Could not transform reference to tip: " << ex.what() << std::endl;
     }
 
-    const long curr_time = getCurrentTime();
+    needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
+    demo_pt.js = js;
+    demo_pt.transform = t;
+    demo_pt.inputs[0] = qLS;
+    demo_pt.inputs[1] = qTX;
+    demo_pt.inputs[2] = qTZ;
+    demo_pt.outputs[0] = t.transform.translation.x;
+    demo_pt.outputs[1] = t.transform.translation.y;
+    demo_pt.outputs[2] = t.transform.translation.z;
+
+    portDemoPoint.write(demo_pt);
+
     while(!insert_cmds.empty() && curr_time >= insert_cmds.front().start_time + insertion_start_time){
         const auto cmd = insert_cmds.front();
         insert_cmds.pop();
@@ -143,43 +186,6 @@ void rtt_ros2_zaber_auto_insertion::autoInsertion(const std::string& file){
 
 void rtt_ros2_zaber_auto_insertion::home(){
     setHome();
-}
-
-sensor_msgs::msg::JointState rtt_ros2_zaber_auto_insertion::getCurrentJointState() {
-    
-    const long updateTime = getCurrentTime(); 
-
-    const double qLS = getPositionLS(); 
-    const double qTX = getPositionTX();
-    const double qTZ = getPositionTZ(); 
-
-    const double qdLS = (qLS - oldPoseLS) * (pow(10,9)) / (updateTime - oldTime);
-    const double qdTX = (qTX - oldPoseTX) * (pow(10,9)) / (updateTime - oldTime);
-    const double qdTZ = (qTZ - oldPoseTZ) * (pow(10,9)) / (updateTime - oldTime);
-
-    oldPoseLS = qLS; 
-    oldPoseTX = qTX; 
-    oldPoseTZ = qTZ; 
-
-    oldTime = updateTime;
-
-    sensor_msgs::msg::JointState js; 
-    
-    js.name.push_back("linearStage");
-    js.position.push_back(qLS);
-    js.velocity.push_back(qdLS); 
-
-    js.name.push_back("templateX");
-    js.position.push_back(qTX);
-    js.velocity.push_back(qdTX);
-
-    js.name.push_back("templateZ");
-    js.position.push_back(qTZ);
-    js.velocity.push_back(qdTZ);
-
-    js.header.stamp = rtt_ros2_node::getNode(this)->now(); 
-
-    return js;
 }
 
 void rtt_ros2_zaber_auto_insertion::setHome(){

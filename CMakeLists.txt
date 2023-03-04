@@ -19,12 +19,9 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rtt_ros2 REQUIRED)
 find_package(rtt_ros2_node REQUIRED)
-find_package(rtt_ros2_geometry_msgs REQUIRED)
-find_package(rtt_ros2_sensor_msgs REQUIRED)
-find_package(rtt_ros2_std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
-
+find_package(needle_steering_control_demo_msgs REQUIRED)
 
 # find_package(rclcpp REQUIRED)
 
@@ -68,10 +65,10 @@ target_link_libraries(rtt_ros2_zaber_auto_insertion
   zml
 )
 
-ament_target_dependencies(
-  rtt_ros2_zaber_auto_insertion
+ament_target_dependencies(rtt_ros2_zaber_auto_insertion
   tf2
   tf2_ros
+  needle_steering_control_demo_msgs
 )
 
 orocos_generate_package()
