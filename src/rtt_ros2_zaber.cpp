@@ -192,7 +192,7 @@ void rtt_ros2_zaber::updateHook(){
                     vel_TZ = 1.0; 
                 }
                 else {
-                    std::cout << "Template Z is at its higer limit" << std::endl;
+                    std::cout << "Template Z is atthis->linearStage.moveVelocity(vel_LS, Units::VELOCITY_MILLIMETRES_PER_SECOND); its higer limit" << std::endl;
                 }
             }
             else if (teleop_cmd.linear.z < -0.2){
@@ -204,14 +204,22 @@ void rtt_ros2_zaber::updateHook(){
                 }
             }
 
+            this->linearStage.moveVelocity(vel_LS, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+            this->templateX.moveVelocity(vel_TX, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+            this->templateZ.moveVelocity(vel_TZ, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+
         }
 
 
        
-        this->linearStage.moveVelocity(vel_LS, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-        this->templateX.moveVelocity(vel_TX, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-        this->templateZ.moveVelocity(vel_TZ, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        
 
+    }
+
+    if (qLS >= 100) {
+        this->linearStageVel = 0.0; 
+        //std::cout << "Linear stage is at its higher limit" << std::endl;
+        this->setLinearVel = true; 
     }
 
     if (this->teleop_controlXZ){
@@ -221,22 +229,7 @@ void rtt_ros2_zaber::updateHook(){
         double vel_TZ = 0;
 
         if (portSetTeleop.read(teleop_cmd) == RTT::NewData){
-            // if (teleop_cmd.linear.x < -0.2){
-            //     if (qLS < 100){
-            //         vel_LS = 1.0; 
-            //     }
-            //     else {
-            //         std::cout << "Linear stage is at its higher limit" << std::endl;
-            //     }
-            // }
-            // else if (teleop_cmd.linear.x > 0.2){
-            //     if (qLS > 0){
-            //         vel_LS = -1.0; 
-            //     }
-            //     else {
-            //         std::cout << "Linear stage is at its lower limit" << std::endl;
-            //     }
-            // }
+            
 
             if (teleop_cmd.linear.y < -0.2){
                 if (qTX < 3){
@@ -272,11 +265,20 @@ void rtt_ros2_zaber::updateHook(){
                 }
             }
 
+            if (this->setLinearVel) {
+                if (vel_LS == 0.0) {
+                    std::cout << "Linear stage is at its higher limit" << std::endl;
+                }
+                this->linearStage.moveVelocity(vel_LS, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+                this->setLinearVel = false; 
+            }
+            
+            this->templateX.moveVelocity(vel_TX, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+            this->templateZ.moveVelocity(vel_TZ, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+
         }
 
-        this->linearStage.moveVelocity(vel_LS, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-        this->templateX.moveVelocity(vel_TX, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-        this->templateZ.moveVelocity(vel_TZ, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+        
 
     }
 }
@@ -330,7 +332,7 @@ void rtt_ros2_zaber::HomeTX() {
 void rtt_ros2_zaber::HomeTZ() {
 
     if (this->templateZ.isBusy()){
-        throw std::invalid_argument("Template X-axis is busy, cannot recieve new command");
+        throw std::invalid_argument("Template Z-axis is busy, cannot recieve new command");
     }
     else{
         this->templateZ.moveAbsolute(this->templateZ_home, Units::LENGTH_MILLIMETRES, false, 5, Units::VELOCITY_MILLIMETRES_PER_SECOND); 
@@ -494,6 +496,7 @@ void rtt_ros2_zaber::StartTeleopXZControl(const double& velocity)
     this->topic_control = false; 
     this->teleop_control = false; 
     this->linearStageVel = velocity;
+    this->setLinearVel = true; 
 }
 
 void rtt_ros2_zaber::StopTeleopXZControl()

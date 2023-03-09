@@ -90,5 +90,6 @@ private:
     double oldPoseTZ; 
 
     double linearStageVel = 1.0; 
+    bool setLinearVel = false; 
 
 };
