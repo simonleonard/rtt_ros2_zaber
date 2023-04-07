@@ -8,18 +8,18 @@
 
 
 constexpr double TX_HOME = 12.5;
-constexpr double templateX_lower_limit = 7.5; 
-constexpr double templateX_upper_limit = 17.5; 
+constexpr double TX_LOWER_LIMIT = 7.5;
+constexpr double TX_UPPER_LIMIT = 17.5;
 
 constexpr double TZ_HOME = 10.0; 
-constexpr double templateZ_lower_limit = 5.0; 
-constexpr double templateZ_upper_limit = 15.0; 
+constexpr double TZ_LOWER_LIMIT = 5.0;
+constexpr double TZ_UPPER_LIMIT = 15.0;
 
-constexpr double LS_HOME = 20.0; 
-constexpr double linearStage_lower_limit = 20.0; 
-constexpr double linearStage_upper_limit = 120.0; 
+constexpr double LS_HOME = 20.0;
+constexpr double LS_LOWER_LIMIT = 20.0;
+constexpr double LS_UPPER_LIMIT = 120.0;
 
-constexpr double default_speed = 5.0; /* mm /s */
+constexpr double DEFAULT_SPEED = 5.0; /* mm /s */
 
 rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& name):
     RTT::TaskContext(name),
@@ -37,6 +37,17 @@ rtt_ros2_zaber_auto_insertion::rtt_ros2_zaber_auto_insertion(const std::string& 
 
     addOperation("AutoInsertion", &rtt_ros2_zaber_auto_insertion::autoInsertion, this, RTT::OwnThread);
     addOperation("Home", &rtt_ros2_zaber_auto_insertion::home, this, RTT::OwnThread);
+
+    addOperation("GetPositionLS", &rtt_ros2_zaber_auto_insertion::getPositionLS, this, RTT::OwnThread);
+    addOperation("GetPositionTX", &rtt_ros2_zaber_auto_insertion::getPositionTX, this, RTT::OwnThread);
+    addOperation("GetPositionTZ", &rtt_ros2_zaber_auto_insertion::getPositionTZ, this, RTT::OwnThread);
+
+    addOperation("MoveRelativeLS", &rtt_ros2_zaber_auto_insertion::MoveRelativeLS, this, RTT::OwnThread);
+    addOperation("MoveRelativeTX", &rtt_ros2_zaber_auto_insertion::MoveRelativeTX, this, RTT::OwnThread);
+    addOperation("MoveRelativeTZ", &rtt_ros2_zaber_auto_insertion::MoveRelativeTZ, this, RTT::OwnThread);
+    addOperation("MoveAbsoluteLS", &rtt_ros2_zaber_auto_insertion::MoveAbsoluteLS, this, RTT::OwnThread);
+    addOperation("MoveAbsoluteTX", &rtt_ros2_zaber_auto_insertion::MoveAbsoluteTX, this, RTT::OwnThread);
+    addOperation("MoveAbsoluteTZ", &rtt_ros2_zaber_auto_insertion::MoveAbsoluteTZ, this, RTT::OwnThread);
 
     const auto node = rtt_ros2_node::getNode(this);
     tf_buffer_ =
@@ -118,9 +129,9 @@ void rtt_ros2_zaber_auto_insertion::updateHook(){
 
     geometry_msgs::msg::TransformStamped t;
     try {
-        t = tf_buffer_->lookupTransform("reference", "tip", tf2_ros::fromRclcpp(timestamp));
+        t = tf_buffer_->lookupTransform("base", "tip", tf2_ros::fromRclcpp(timestamp));
     } catch (const tf2::TransformException & ex) {
-        std::cout << "Could not transform reference to tip: " << ex.what() << std::endl;
+        std::cout << "Could not transform base to tip: " << ex.what() << std::endl;
     }
 
     needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
@@ -171,6 +182,88 @@ double rtt_ros2_zaber_auto_insertion::getPositionTZ() {
     return templateZ.getPosition(Units::LENGTH_MILLIMETRES) - TZ_HOME; 
 }
 
+void rtt_ros2_zaber_auto_insertion::MoveRelativeLS(const double& distance, const double& velocity){
+    if (linearStage.isBusy()){
+        throw std::invalid_argument("Device is busy, cannot recieve new command");
+    }
+    else if (((linearStage.getPosition(Units::LENGTH_MILLIMETRES) + distance) < LS_LOWER_LIMIT) ||
+            ((linearStage.getPosition(Units::LENGTH_MILLIMETRES) + distance) > LS_UPPER_LIMIT)){
+        std::cout << "LinearStage pose: " << getPositionLS() << std::endl;
+        throw std::invalid_argument("Device cannot recede beyond the origin 0mm and cannot exceed above 100mm");
+    }
+    else{
+        linearStage.moveRelative(distance, Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+}
+
+void rtt_ros2_zaber_auto_insertion::MoveRelativeTX(const double& distance, const double& velocity) {
+    if(templateX.isBusy()){
+        throw std::invalid_argument("Template x-axis is busy, cannot recieve new command");
+    }
+    else if (((templateX.getPosition(Units::LENGTH_MILLIMETRES) + distance) < TX_LOWER_LIMIT) ||
+            ((templateX.getPosition(Units::LENGTH_MILLIMETRES) + distance) > TX_UPPER_LIMIT)){
+
+                std::cout << "Template x-axis: " << getPositionTX() << std::endl;
+                throw std::invalid_argument("Relative move for template along x-axis is out of bound, {-5,5}");
+    }
+    else {
+        templateX.moveRelative(distance, Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+
+
+}
+
+void rtt_ros2_zaber_auto_insertion::MoveRelativeTZ(const double& distance, const double& velocity) {
+    if(templateZ.isBusy()){
+        throw std::invalid_argument("Template z-axis is busy, cannot recieve new command");
+    }
+    else if (((templateZ.getPosition(Units::LENGTH_MILLIMETRES) + distance) < TZ_LOWER_LIMIT) ||
+            ((templateZ.getPosition(Units::LENGTH_MILLIMETRES) + distance) > TZ_UPPER_LIMIT)){
+
+                std::cout << "Template z-axis: " << getPositionTZ() << std::endl;
+                throw std::invalid_argument("Relative move for template along z-axis is out of bound, {-5,5}");
+    }
+    else {
+        templateZ.moveRelative(distance, Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+}
+
+void rtt_ros2_zaber_auto_insertion::MoveAbsoluteLS(const double& pose, const double& velocity){
+    if (linearStage.isBusy()){
+        throw std::invalid_argument("LinearStage is busy, cannot recieve new command");
+    }
+    else if (pose < (LS_LOWER_LIMIT - LS_HOME) || pose > (LS_UPPER_LIMIT - LS_HOME)){
+        throw std::invalid_argument("Requested pose for linear stage is out of bound;  {0,100}");
+    }
+    else {
+        linearStage.moveAbsolute((pose+LS_HOME), Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+}
+
+void rtt_ros2_zaber_auto_insertion::MoveAbsoluteTX(const double& pose, const double& velocity){
+    if (templateX.isBusy()){
+        throw std::invalid_argument("Template x-axis is busy!");
+    }
+    else if (pose < (TX_LOWER_LIMIT - TX_HOME) || pose > (TX_UPPER_LIMIT - TX_HOME)){
+        throw std::invalid_argument("Requested pose for template x-axis is out of bound;  {-5,5}");
+    }
+    else {
+        templateX.moveAbsolute((pose+TX_HOME), Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+}
+
+void rtt_ros2_zaber_auto_insertion::MoveAbsoluteTZ(const double& pose, const double& velocity){
+    if (templateZ.isBusy()){
+        throw std::invalid_argument("Template z-axis is busy!");
+    }
+    else if (pose < (TZ_LOWER_LIMIT - TZ_HOME) || pose > (TZ_UPPER_LIMIT - TZ_HOME)){
+        throw std::invalid_argument("Requested pose for template z-axis is out of bound;  {-5,5}");
+    }
+    else {
+        templateZ.moveAbsolute((pose+TZ_HOME), Units::LENGTH_MILLIMETRES, false, velocity, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    }
+}
+
 void rtt_ros2_zaber_auto_insertion::autoInsertion(const std::string& file){
     std::ifstream infile(file);
 
@@ -189,9 +282,9 @@ void rtt_ros2_zaber_auto_insertion::home(){
 }
 
 void rtt_ros2_zaber_auto_insertion::setHome(){
-    templateX.moveAbsolute(TX_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-    templateZ.moveAbsolute(TZ_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
-    linearStage.moveAbsolute(LS_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, default_speed, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    templateX.moveAbsolute(TX_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, DEFAULT_SPEED, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    templateZ.moveAbsolute(TZ_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, DEFAULT_SPEED, Units::VELOCITY_MILLIMETRES_PER_SECOND);
+    linearStage.moveAbsolute(LS_HOME, Units::LENGTH_MILLIMETRES, true /* waitUntilIdle */, DEFAULT_SPEED, Units::VELOCITY_MILLIMETRES_PER_SECOND);
 }
 
 long rtt_ros2_zaber_auto_insertion::getCurrentTime(){

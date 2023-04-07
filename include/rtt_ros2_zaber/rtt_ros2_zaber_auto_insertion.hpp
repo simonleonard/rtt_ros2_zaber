@@ -50,6 +50,13 @@ public:
     double getPositionTX(); 
     double getPositionTZ(); 
 
+    void MoveRelativeLS(const double& distance, const double& velocity);
+    void MoveRelativeTX(const double& distance, const double& velocity);
+    void MoveRelativeTZ(const double& distance, const double& velocity);
+    void MoveAbsoluteLS(const double& pose, const double& velocity);
+    void MoveAbsoluteTX(const double& pose, const double& velocity);
+    void MoveAbsoluteTZ(const double& pose, const double& velocity);
+
     void autoInsertion(const std::string& file);
     void home();
 
