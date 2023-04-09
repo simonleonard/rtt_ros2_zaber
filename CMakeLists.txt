@@ -42,17 +42,24 @@ include_directories(
   include 
 )
 
-orocos_component(rtt_ros2_zaber src/rtt_ros2_zaber.cpp)
-target_link_libraries(rtt_ros2_zaber
-  rtt_ros2::rtt_ros2
-  rtt_ros2_node::rtt_ros2_node
-  # rtt_std_msgs_typekit
-  zml
-  # rclcpp
-)
+# orocos_component(rtt_ros2_zaber src/rtt_ros2_zaber.cpp)
+# target_link_libraries(rtt_ros2_zaber
+#   rtt_ros2::rtt_ros2
+#   rtt_ros2_node::rtt_ros2_node
+#   # rtt_std_msgs_typekit
+#   zml
+#   # rclcpp
+# )
 
-orocos_component(rtt_ros2_zaber2 src/rtt_ros2_zaber2.cpp)
-target_link_libraries(rtt_ros2_zaber2
+# orocos_component(rtt_ros2_zaber2 src/rtt_ros2_zaber2.cpp)
+# target_link_libraries(rtt_ros2_zaber2
+#   rtt_ros2::rtt_ros2
+#   rtt_ros2_node::rtt_ros2_node
+#   zml
+# )
+
+orocos_component(rtt_ros2_zaber_base src/rtt_ros2_zaber_base.cpp)
+target_link_libraries(rtt_ros2_zaber_base
   rtt_ros2::rtt_ros2
   rtt_ros2_node::rtt_ros2_node
   zml
@@ -60,9 +67,7 @@ target_link_libraries(rtt_ros2_zaber2
 
 orocos_component(rtt_ros2_zaber_auto_insertion src/rtt_ros2_zaber_auto_insertion.cpp)
 target_link_libraries(rtt_ros2_zaber_auto_insertion
-  rtt_ros2::rtt_ros2
-  rtt_ros2_node::rtt_ros2_node
-  zml
+  rtt_ros2_zaber_base
 )
 
 ament_target_dependencies(rtt_ros2_zaber_auto_insertion
