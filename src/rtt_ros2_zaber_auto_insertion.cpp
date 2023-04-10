@@ -1,9 +1,10 @@
+#include "rtt_ros2_zaber/rtt_ros2_zaber_auto_insertion.hpp"
+
 #include <fstream>
 #include <limits>
 #include <rtt/Component.hpp>
 #include <rtt/internal/GlobalService.hpp>
 #include <rtt_ros2_node/rtt_ros2_node.hpp>
-#include <rtt_ros2_zaber/rtt_ros2_zaber_auto_insertion.hpp>
 #include <rtt_ros2_zaber/rtt_ros2_zaber_constants.hpp>
 
 RttRos2ZaberAutoInsertion::RttRos2ZaberAutoInsertion(const std::string& name)

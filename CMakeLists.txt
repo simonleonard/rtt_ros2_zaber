@@ -39,7 +39,8 @@ endif()
 ament_package()
 
 include_directories(
-  include 
+  include
+  eigen-3.4.0
 )
 
 # orocos_component(rtt_ros2_zaber src/rtt_ros2_zaber.cpp)
@@ -68,6 +69,17 @@ target_link_libraries(rtt_ros2_zaber_base
 orocos_component(rtt_ros2_zaber_auto_insertion src/rtt_ros2_zaber_auto_insertion.cpp)
 target_link_libraries(rtt_ros2_zaber_auto_insertion
   rtt_ros2_zaber_base
+)
+
+orocos_component(rtt_ros2_zaber_control_reproduce src/rtt_ros2_zaber_control_reproduce.cpp)
+target_link_libraries(rtt_ros2_zaber_control_reproduce
+  rtt_ros2_zaber_base
+)
+
+ament_target_dependencies(rtt_ros2_zaber_control_reproduce
+  tf2
+  tf2_ros
+  needle_steering_control_demo_msgs
 )
 
 ament_target_dependencies(rtt_ros2_zaber_auto_insertion
