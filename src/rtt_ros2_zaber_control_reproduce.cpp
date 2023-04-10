@@ -46,6 +46,7 @@ void RttRos2ZaberControlReproduce::updateHook() {
     if (state == State::DEMO) {
         collect_demo_points();
     } else if (state == State::CONTROL) {
+        control_loop();
     }
 }
 
@@ -97,6 +98,13 @@ void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
 
     state = State::CONTROL;
     ready_to_reproduce = false;
+    // Tx, LS, TZ
+    prev_wpt.input << js.position[1], js.position[0], js.position[2];
+    // X, Y, Z
+    prev_wpt.output << RxBaseTip.transform.translation.x,
+        RxBaseTip.transform.translation.y, RxBaseTip.transform.translation.z;
+
+    jacobian << -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0;
 }
 
 void RttRos2ZaberControlReproduce::collect_demo_points() {
@@ -140,7 +148,37 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
 }
 
 void RttRos2ZaberControlReproduce::control_loop() {
-    // TODO
+    WayPoint wpt;
+    // Tx, LS, TZ
+    wpt.input << js.position[1], js.position[0], js.position[2];
+    // X, Y, Z
+    wpt.output << RxBaseTip.transform.translation.x,
+        RxBaseTip.transform.translation.y, RxBaseTip.transform.translation.z;
+
+    mimic_trajectory.push_back(wpt);
+
+    // Skip reached targets.
+    while (!target_trajectory.empty() &&
+           wpt.output.y() > target_trajectory.front().y() &&
+           (wpt.output - target_trajectory.front()).norm() <
+               kControlTargetThreshold) {
+        target_trajectory.pop();
+    }
+
+    // Stop if no target left.
+    if (target_trajectory.empty()) {
+        linearStage.stop();
+        templateX.stop();
+        templateZ.stop();
+    }
+
+    // Update Jacobian.
+    Eigen::Vector3d dx = wpt.input - prev_wpt.input;
+    Eigen::Vector3d dy = wpt.output - prev_wpt.output;
+    jacobian = jacobian +
+               (dy - jacobian * dx) * dx.transpose() / (dx.transpose() * dx);
+
+    // Calculate control input.
 }
 
 std::ostream& operator<<(std::ostream& os,

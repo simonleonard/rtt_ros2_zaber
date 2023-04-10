@@ -35,13 +35,18 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     State state;
 
+    // Auto insertion.
     long insertion_start_time;
     std::queue<Command> insert_cmds;
 
+    // Record target way points.
     double linear_stage_step;
     double next_linear_stage_plane;
 
+    // Reproduce control loop.
     bool ready_to_reproduce;
+    WayPoint prev_wpt;
+    Eigen::Matrix3d jacobian;
 
     std::queue<Eigen::Vector3d> target_trajectory;
     std::vector<WayPoint> demo_trajectory;

@@ -15,6 +15,8 @@ constexpr double kLsUpperLimit = 120.0;
 constexpr double kDefaultVel = 2.5; /* mm / s */
 constexpr double kDefaultAccel = 0.5; /* mm / s^2 */
 
+constexpr double kControlTargetThreshold = 0.1; /* mm */
+
 constexpr zaber::motion::Units kLenUnitMM =
     zaber::motion::Units::LENGTH_MILLIMETRES;
 constexpr zaber::motion::Units kVelUnitMMPS =
