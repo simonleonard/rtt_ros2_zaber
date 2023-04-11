@@ -94,7 +94,9 @@ void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
     }
     if (!ready_to_reproduce) {
         std::cout << "Not ready to reprpduce." << std::endl;
+        return;
     }
+    mimic_trajectory.clear();
 
     state = State::CONTROL;
     ready_to_reproduce = false;
@@ -170,6 +172,9 @@ void RttRos2ZaberControlReproduce::control_loop() {
         linearStage.stop();
         templateX.stop();
         templateZ.stop();
+
+        state = State::IDLE;
+        return;
     }
 
     // Update Jacobian.
@@ -179,6 +184,16 @@ void RttRos2ZaberControlReproduce::control_loop() {
                (dy - jacobian * dx) * dx.transpose() / (dx.transpose() * dx);
 
     // Calculate control input.
+    Eigen::Vector3d control_input = jacobian.inverse() *  (target_trajectory.front() - wpt.output);
+    control_input *= kMaxControlVel / control_input.norm();
+
+    // Send velocities.
+    templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
+    linearStage.moveVelocity(control_input.y(), kVelUnitMMPS);
+    templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
+
+    // Update previous way point.
+    prev_wpt = wpt;
 }
 
 std::ostream& operator<<(std::ostream& os,
