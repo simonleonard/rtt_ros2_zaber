@@ -24,6 +24,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void stopHook() override;
     void cleanupHook() override;
 
+    void printTipPosition() const;
+    void printJacobian() const;
+
     void autoInsertion(const std::string& file);
     void reproduce(const std::string& experiment);
 
@@ -41,20 +44,25 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     // Record target way points.
     double linear_stage_step;
-    double next_linear_stage_plane;
+    double prev_linear_stage_plane;
+
+    double max_control_vel;
 
     // Reproduce control loop.
     bool ready_to_reproduce;
     WayPoint prev_wpt;
     Eigen::Matrix3d jacobian;
 
-    std::queue<Eigen::Vector3d> target_trajectory;
+    std::vector<Eigen::Vector3d> target_trajectory;
+    size_t target_index;
+
     std::vector<WayPoint> demo_trajectory;
     std::vector<WayPoint> mimic_trajectory;
 
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    geometry_msgs::msg::TransformStamped RxBaseTip;
+
+    Eigen::Vector3d tip_position;
 };
 
 std::ostream& operator<<(std::ostream& os,

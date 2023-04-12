@@ -23,6 +23,9 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
     addOperation("GetPositionTZ", &RttRos2ZaberBase::getPositionTZ, this,
                  RTT::OwnThread);
 
+    addOperation("PrintPosition", &RttRos2ZaberBase::printPosition, this,
+                 RTT::OwnThread);
+
     addOperation("MoveRelativeLS", &RttRos2ZaberBase::MoveRelativeLS, this,
                  RTT::OwnThread);
     addOperation("MoveRelativeTX", &RttRos2ZaberBase::MoveRelativeTX, this,
@@ -44,6 +47,8 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
 }
 
 bool RttRos2ZaberBase::RttRos2ZaberBase::configureHook() {
+    RTT::log().setLogLevel(RTT::Logger::Info);
+
     connection = zaber::motion::ascii::Connection::openSerialPort(device_file);
 
     std::vector<zaber::motion::ascii::Device> deviceList =
@@ -121,11 +126,16 @@ double RttRos2ZaberBase::getPositionLS() {
 }
 
 double RttRos2ZaberBase::getPositionTX() {
-    return templateX.getPosition(kLenUnitMM) - kTXHome;
+    return templateX.getPosition(kLenUnitMM) - kTxHome;
 }
 
 double RttRos2ZaberBase::getPositionTZ() {
     return templateZ.getPosition(kLenUnitMM) - kTzHome;
+}
+
+void RttRos2ZaberBase::printPosition() {
+    RTT::log(RTT::Info) << getPositionTX() << " " << getPositionLS() << " "
+                        << getPositionTZ() << RTT::endlog();
 }
 
 void RttRos2ZaberBase::MoveRelativeLS(double distance, double velocity) {
@@ -170,7 +180,7 @@ void RttRos2ZaberBase::MoveRelativeTZ(double distance, double velocity) {
     } else if (((templateZ.getPosition(kLenUnitMM) + distance) <
                 kTzLowerLimit) ||
                ((templateZ.getPosition(kLenUnitMM) + distance) >
-                kTZUpperLimit)) {
+                kTzUpperLimit)) {
         std::cout << "Template z-axis: " << getPositionTZ() << std::endl;
         throw std::invalid_argument(
             "Relative move for template along z-axis is out of bound, {-5,5}");
@@ -199,12 +209,12 @@ void RttRos2ZaberBase::MoveAbsoluteTX(double pose, double velocity,
                                       double accel) {
     if (templateX.isBusy()) {
         throw std::invalid_argument("Template x-axis is busy!");
-    } else if (pose < (kTxLowerLimit - kTXHome) ||
-               pose > (kTxUpperLimit - kTXHome)) {
+    } else if (pose < (kTxLowerLimit - kTxHome) ||
+               pose > (kTxUpperLimit - kTxHome)) {
         throw std::invalid_argument(
             "Requested pose for template x-axis is out of bound;  {-5,5}");
     } else {
-        templateX.moveAbsolute((pose + kTXHome), kLenUnitMM, false, velocity,
+        templateX.moveAbsolute((pose + kTxHome), kLenUnitMM, false, velocity,
                                kVelUnitMMPS, accel, kAccelUnitMMPS2);
     }
 }
@@ -214,7 +224,7 @@ void RttRos2ZaberBase::MoveAbsoluteTZ(double pose, double velocity,
     if (templateZ.isBusy()) {
         throw std::invalid_argument("Template z-axis is busy!");
     } else if (pose < (kTzLowerLimit - kTzHome) ||
-               pose > (kTZUpperLimit - kTzHome)) {
+               pose > (kTzUpperLimit - kTzHome)) {
         throw std::invalid_argument(
             "Requested pose for template z-axis is out of bound;  {-5,5}");
     } else {
@@ -226,7 +236,7 @@ void RttRos2ZaberBase::MoveAbsoluteTZ(double pose, double velocity,
 void RttRos2ZaberBase::home() { setHome(); }
 
 void RttRos2ZaberBase::setHome() {
-    templateX.moveAbsolute(kTXHome, kLenUnitMM, true /* waitUntilIdle */,
+    templateX.moveAbsolute(kTxHome, kLenUnitMM, true /* waitUntilIdle */,
                            kDefaultVel, kVelUnitMMPS);
     templateZ.moveAbsolute(kTzHome, kLenUnitMM, true /* waitUntilIdle */,
                            kDefaultVel, kVelUnitMMPS);

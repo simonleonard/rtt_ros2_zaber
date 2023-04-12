@@ -65,7 +65,7 @@ void RttRos2ZaberAutoInsertion::updateHook() {
                                      cmd.velocity, kVelUnitMMPS, kDefaultAccel,
                                      kAccelUnitMMPS2);
         } else if (cmd.joint == "TX") {
-            templateX.moveAbsolute((cmd.target + kTXHome), kLenUnitMM, false,
+            templateX.moveAbsolute((cmd.target + kTxHome), kLenUnitMM, false,
                                    cmd.velocity, kVelUnitMMPS, kDefaultAccel,
                                    kAccelUnitMMPS2);
         } else if (cmd.joint == "TZ") {
