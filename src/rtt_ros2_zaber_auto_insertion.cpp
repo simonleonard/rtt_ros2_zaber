@@ -11,6 +11,8 @@ RttRos2ZaberAutoInsertion::RttRos2ZaberAutoInsertion(const std::string& name)
     : RttRos2ZaberBase(name),
       insertion_start_time(std::numeric_limits<long>::max() / 2) {
     addPort("demo_point", portDemoPoint);
+    addPort("control_input", portControlInput);
+    addPort("control_output", portControlOutput);
 
     addOperation("AutoInsertion", &RttRos2ZaberAutoInsertion::autoInsertion,
                  this, RTT::OwnThread);
@@ -46,14 +48,26 @@ void RttRos2ZaberAutoInsertion::updateHook() {
     needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
     demo_pt.js = js;
     demo_pt.transform = t;
-    demo_pt.inputs[0] = js.position[0];
-    demo_pt.inputs[1] = js.position[1];
-    demo_pt.inputs[2] = js.position[2];
-    demo_pt.outputs[0] = t.transform.translation.x;
-    demo_pt.outputs[1] = t.transform.translation.y;
-    demo_pt.outputs[2] = t.transform.translation.z;
 
+    demo_pt.inputs[0] = getPositionTX();
+    demo_pt.inputs[1] = getPositionLS();
+    demo_pt.inputs[2] = getPositionTZ();
+    demo_pt.outputs[0] = t.transform.translation.x * 1000.0;
+    demo_pt.outputs[1] = t.transform.translation.y * 1000.0;
+    demo_pt.outputs[2] = t.transform.translation.z * 1000.0;
     portDemoPoint.write(demo_pt);
+
+    needle_steering_control_demo_msgs::msg::Inputs control_inputs;
+    control_inputs.tx = demo_pt.inputs[0];
+    control_inputs.ls = demo_pt.inputs[1];
+    control_inputs.tz = demo_pt.inputs[2];
+    portControlInput.write(control_inputs);
+
+    needle_steering_control_demo_msgs::msg::Outputs control_outputs;
+    control_outputs.x = demo_pt.outputs[0];
+    control_outputs.y = demo_pt.outputs[1];
+    control_outputs.z = demo_pt.outputs[2];
+    portControlOutput.write(control_outputs);
 
     while (!insert_cmds.empty() &&
            curr_time >= insert_cmds.front().start_time + insertion_start_time) {
