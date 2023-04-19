@@ -1,8 +1,6 @@
 #pragma once
 
 #include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
-#include "needle_steering_control_demo_msgs/msg/inputs.hpp"
-#include "needle_steering_control_demo_msgs/msg/outputs.hpp"
 
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
@@ -25,11 +23,6 @@ class RttRos2ZaberAutoInsertion : public RttRos2ZaberBase {
 
     RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint>
         portDemoPoint;
-
-    RTT::OutputPort<needle_steering_control_demo_msgs::msg::Inputs>
-        portControlInput;
-    RTT::OutputPort<needle_steering_control_demo_msgs::msg::Outputs>
-        portControlOutput;
 
     long insertion_start_time;
     std::queue<Command> insert_cmds;

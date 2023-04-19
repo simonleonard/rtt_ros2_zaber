@@ -11,8 +11,6 @@ RttRos2ZaberAutoInsertion::RttRos2ZaberAutoInsertion(const std::string& name)
     : RttRos2ZaberBase(name),
       insertion_start_time(std::numeric_limits<long>::max() / 2) {
     addPort("demo_point", portDemoPoint);
-    addPort("control_input", portControlInput);
-    addPort("control_output", portControlOutput);
 
     addOperation("AutoInsertion", &RttRos2ZaberAutoInsertion::autoInsertion,
                  this, RTT::OwnThread);
@@ -31,46 +29,29 @@ bool RttRos2ZaberAutoInsertion::startHook() {
 }
 
 void RttRos2ZaberAutoInsertion::updateHook() {
-    const auto timestamp = rtt_ros2_node::getNode(this)->now();
-    const long curr_time = timestamp.nanoseconds();
-
-    RttRos2ZaberBase::updateHook();
-
     geometry_msgs::msg::TransformStamped t;
     try {
-        t = tf_buffer_->lookupTransform("base", "tip",
-                                        tf2_ros::fromRclcpp(timestamp));
+        t = tf_buffer_->lookupTransform("base", "tip", tf2::TimePointZero);
     } catch (const tf2::TransformException& ex) {
         std::cout << "Could not transform base to tip: " << ex.what()
                   << std::endl;
     }
 
     needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
-    demo_pt.js = js;
-    demo_pt.transform = t;
+    demo_pt.header.frame_id = "Control";
+        demo_pt.header.stamp = t.header.stamp;
 
-    demo_pt.inputs[0] = getPositionTX();
-    demo_pt.inputs[1] = getPositionLS();
-    demo_pt.inputs[2] = getPositionTZ();
-    demo_pt.outputs[0] = t.transform.translation.x * 1000.0;
-    demo_pt.outputs[1] = t.transform.translation.y * 1000.0;
-    demo_pt.outputs[2] = t.transform.translation.z * 1000.0;
+    demo_pt.inputs.tx = getPositionTX();
+    demo_pt.inputs.ls = getPositionLS();
+    demo_pt.inputs.tz = getPositionTZ();
+    demo_pt.outputs.x = t.transform.translation.x * 1000.0;
+    demo_pt.outputs.y = t.transform.translation.y * 1000.0;
+    demo_pt.outputs.z = t.transform.translation.z * 1000.0;
     portDemoPoint.write(demo_pt);
 
-    needle_steering_control_demo_msgs::msg::Inputs control_inputs;
-    control_inputs.tx = demo_pt.inputs[0];
-    control_inputs.ls = demo_pt.inputs[1];
-    control_inputs.tz = demo_pt.inputs[2];
-    portControlInput.write(control_inputs);
-
-    needle_steering_control_demo_msgs::msg::Outputs control_outputs;
-    control_outputs.x = demo_pt.outputs[0];
-    control_outputs.y = demo_pt.outputs[1];
-    control_outputs.z = demo_pt.outputs[2];
-    portControlOutput.write(control_outputs);
-
     while (!insert_cmds.empty() &&
-           curr_time >= insert_cmds.front().start_time + insertion_start_time) {
+           rtt_ros2_node::getNode(this)->now().nanoseconds() >=
+               insert_cmds.front().start_time + insertion_start_time) {
         const auto cmd = insert_cmds.front();
         insert_cmds.pop();
         std::cout << cmd.joint << std::endl;

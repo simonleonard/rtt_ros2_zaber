@@ -10,8 +10,6 @@ import("rtt_ros2_zaber")
 loadComponent("zaber_control_reproduce", "RttRos2ZaberControlReproduce" )
 setActivity("zaber_control_reproduce", 0.005, 0, ORO_SCHED_OTHER)
 
-stream("zaber_control_reproduce.joint_state", ros.topic("/joint_state", false))
-
 zaber_control_reproduce.device_file = "/dev/ttyUSB1"
 zaber_control_reproduce.linear_stage_step = 0.5
 zaber_control_reproduce.max_control_vel = 1.0
