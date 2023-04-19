@@ -6,6 +6,7 @@
 #include "Eigen/Dense"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
+#include "rtt_ros2_zaber/sg_filter.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
@@ -64,6 +65,23 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     Eigen::Vector3d tip_position;
 };
+
+class DemoTrajCollector {
+   public:
+    DemoTrajCollector(int filter_window_size, int filter_order);
+    std::vector<Eigen::Vector3d> get_target_traj() const;
+
+   private:
+    std::vector<Eigen::Vector3d> inputs;
+    std::vector<Eigen::Vector3d> outputs;
+    SavitzkyGolayFilter ndi_filter;
+};
+
+class ControlTrajTracker {
+    public:
+    private:
+    std::vector<Eigen::Vector3d> inputs;
+}
 
 std::ostream& operator<<(std::ostream& os,
                          RttRos2ZaberControlReproduce::State s);

@@ -59,6 +59,8 @@ include_directories(
 #   zml
 # )
 
+add_library(sg_filter SHARED src/sg_filter.cpp)
+
 orocos_component(rtt_ros2_zaber_base src/rtt_ros2_zaber_base.cpp)
 target_link_libraries(rtt_ros2_zaber_base
   rtt_ros2::rtt_ros2
@@ -74,6 +76,7 @@ target_link_libraries(rtt_ros2_zaber_auto_insertion
 orocos_component(rtt_ros2_zaber_control_reproduce src/rtt_ros2_zaber_control_reproduce.cpp)
 target_link_libraries(rtt_ros2_zaber_control_reproduce
   rtt_ros2_zaber_base
+  sg_filter
 )
 
 ament_target_dependencies(rtt_ros2_zaber_control_reproduce

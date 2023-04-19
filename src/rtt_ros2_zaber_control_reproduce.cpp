@@ -77,6 +77,8 @@ void RttRos2ZaberControlReproduce::printJacobian() const {
 }
 
 void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
+    SavitzkyGolayFilter filter(5, 5, 3);
+
     if (state != State::IDLE) {
         RTT::log(RTT::Error)
             << "Cannot perform auto insertion, current state is " << state
@@ -218,15 +220,16 @@ void RttRos2ZaberControlReproduce::control_loop() {
     }
 
     // Stop if no target left.
-    if (target_index == target_trajectory.size() ) {
+    if (target_index == target_trajectory.size()) {
         linearStage.stop();
         templateX.stop();
         templateZ.stop();
 
         RTT::log(RTT::Info)
             << "Finished reproducing trajectory." << RTT::endlog();
-        RTT::log(RTT::Info) << "Last target:\n"
-                            << target_trajectory.back().transpose() << RTT::endlog();
+        RTT::log(RTT::Info)
+            << "Last target:\n"
+            << target_trajectory.back().transpose() << RTT::endlog();
         state = State::IDLE;
         RTT::log(RTT::Info) << "Switch to state: " << state << RTT::endlog();
 
