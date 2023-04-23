@@ -16,6 +16,7 @@ zaber_control_reproduce.max_control_vel = 1.0
 zaber_control_reproduce.jacobian_update_step = 0.5
 zaber_control_reproduce.target_ahead_dis = 0.5
 zaber_control_reproduce.error_tolerance = 0.1
+zaber_control_reproduce.sg_filtering = true
 
 zaber_control_reproduce.configure() 
 zaber_control_reproduce.start() 

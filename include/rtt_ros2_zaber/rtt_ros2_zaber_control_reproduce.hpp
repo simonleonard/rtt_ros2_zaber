@@ -51,21 +51,23 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     TrajCollector demo_traj_;
     std::unique_ptr<TrajCollectorIterator> demo_traj_itr_;
 
-    double max_control_vel_;
-
     // Reproduce control loop.
     bool ready_to_reproduce_;
     TrajCollector reproduce_traj_;
+
+    bool sg_filtering_;
+    std::unique_ptr<SavitzkyGolayFilter> filter;
 
     Eigen::Vector3d current_target_;
 
     Eigen::Vector3d prev_joint_states_;
     Eigen::Vector3d prev_tip_position_;
     Eigen::Matrix3d jacobian_;
-    double jacobian_update_step_; // mm
-    double target_ahead_dis_; //mm
-    double error_tolerance_; //mm
+    double jacobian_update_step_;  // mm
 
+    double target_ahead_dis_;  // mm
+    double max_control_vel_;
+    double error_tolerance_;  // mm
 
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;

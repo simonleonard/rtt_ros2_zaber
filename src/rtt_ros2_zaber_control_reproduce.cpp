@@ -29,6 +29,7 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addProperty("jacobian_update_step", jacobian_update_step_);
     addProperty("target_ahead_dis", target_ahead_dis_);
     addProperty("error_tolerance", error_tolerance_);
+    addProperty("sg_filtering", sg_filtering_);
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
@@ -40,8 +41,6 @@ bool RttRos2ZaberControlReproduce::startHook() {
 }
 
 void RttRos2ZaberControlReproduce::updateHook() {
-    // RttRos2ZaberBase::updateHook();
-
     try {
         geometry_msgs::msg::TransformStamped RxBaseTip =
             tf_buffer_->lookupTransform("base", "tip", tf2::TimePointZero);
@@ -105,30 +104,6 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
 }
 
-void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
-    if (state_ != State::IDLE) {
-        RTT::log(RTT::Error)
-            << "Cannot reproduce, current state is " << state_ << RTT::endlog();
-        return;
-    }
-    if (!ready_to_reproduce_) {
-        RTT::log(RTT::Error) << "Not ready to reprpduce." << RTT::endlog();
-        return;
-    }
-
-    reproduce_traj_.clear();
-    demo_traj_itr_->first();
-
-    state_ = State::CONTROL;
-    RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
-
-    prev_tip_position_ = tip_position_;
-    prev_joint_states_ = joint_states_;
-    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
-
-    current_target_ = demo_traj_itr_->current_outputs();
-}
-
 void RttRos2ZaberControlReproduce::collect_demo_points() {
     demo_traj_.addPoint(joint_states_, tip_position_);
 
@@ -164,6 +139,41 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
             demo_traj_itr_ = demo_traj_.createrIterator();
         }
     }
+}
+
+void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
+    if (state_ != State::IDLE) {
+        RTT::log(RTT::Error)
+            << "Cannot reproduce, current state is " << state_ << RTT::endlog();
+        return;
+    }
+    if (!ready_to_reproduce_) {
+        RTT::log(RTT::Error) << "Not ready to reprpduce." << RTT::endlog();
+        return;
+    }
+
+    reproduce_traj_.clear();
+    demo_traj_itr_->first();
+
+    prev_tip_position_ = tip_position_;
+    prev_joint_states_ = joint_states_;
+    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
+
+    if (sg_filtering_) {
+        filter.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2,
+                                             (kSGFilterWindow - 1) / 2,
+                                             kSGFilterOrder));
+        demo_traj_.tip_x() = filter->filter(demo_traj_.tip_x());
+        demo_traj_.tip_y() = filter->filter(demo_traj_.tip_y());
+        demo_traj_.tip_z() = filter->filter(demo_traj_.tip_z());
+        filter.reset(
+            new SavitzkyGolayFilter(kSGFilterWindow - 1, 0, kSGFilterOrder));
+    }
+
+    current_target_ = demo_traj_itr_->current_outputs();
+
+    state_ = State::CONTROL;
+    RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
 }
 
 bool RttRos2ZaberControlReproduce::safety_check() {
@@ -207,11 +217,23 @@ void RttRos2ZaberControlReproduce::update_jacobian() {
 }
 
 void RttRos2ZaberControlReproduce::control_loop() {
-    if (!safety_check()) return;
-
     reproduce_traj_.addPoint(joint_states_, tip_position_);
 
-    // Skip reached targets.
+    if (sg_filtering_) {
+        if (reproduce_traj_.size() < kSGFilterWindow) {
+            RTT::log(RTT::Info)
+                << "Accumulating measurements..." << RTT::endlog();
+            return;
+        }
+        tip_position_.x() = filter->filter_last_one(reproduce_traj_.tip_x());
+        tip_position_.y() = filter->filter_last_one(reproduce_traj_.tip_y());
+        tip_position_.z() = filter->filter_last_one(reproduce_traj_.tip_z());
+    }
+
+    // Stop of joint limits out of ranges.
+    if (!safety_check()) return;
+
+    // Update target.
     while ((current_target_.y() < tip_position_.y() ||
             (current_target_ - tip_position_).cwiseAbs().maxCoeff() <
                 error_tolerance_)) {
@@ -224,7 +246,8 @@ void RttRos2ZaberControlReproduce::control_loop() {
             RTT::log(RTT::Info)
                 << "Finished reproducing trajectory." << RTT::endlog();
             RTT::log(RTT::Info)
-                << "Last target: " << current_target_.transpose() << RTT::endlog();
+                << "Last target: " << current_target_.transpose()
+                << RTT::endlog();
             state_ = State::IDLE;
             RTT::log(RTT::Info)
                 << "Switch to state: " << state_ << RTT::endlog();
