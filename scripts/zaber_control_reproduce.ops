@@ -11,7 +11,11 @@ loadComponent("zaber_control_reproduce", "RttRos2ZaberControlReproduce" )
 setActivity("zaber_control_reproduce", 0.005, 0, ORO_SCHED_OTHER)
 
 zaber_control_reproduce.device_file = "/dev/ttyUSB1"
-zaber_control_reproduce.linear_stage_step = 0.5
+
 zaber_control_reproduce.max_control_vel = 1.0
+zaber_control_reproduce.jacobian_update_step = 0.5
+zaber_control_reproduce.target_ahead_dis = 0.5
+zaber_control_reproduce.error_tolerance = 0.1
+
 zaber_control_reproduce.configure() 
 zaber_control_reproduce.start() 

@@ -1,5 +1,7 @@
 #include "rtt_ros2_zaber/sg_filter.hpp"
 
+#include <Eigen/Core>
+
 int int_power(int x, unsigned int p) {
     if (p == 0) return 1;
     if (p == 1) return x;
@@ -22,18 +24,24 @@ SavitzkyGolayFilter::SavitzkyGolayFilter(int l, int r, int o)
     B = H * (H.transpose() * H).inverse() * H.transpose();
     weights = B.row(l + 1);
 }
-Eigen::VectorXd SavitzkyGolayFilter::filter(
-    const Eigen::Ref<Eigen::VectorXd>& in) {
-    const int n = in.size();
-    Eigen::VectorXd out(n);
-    out.head(left) = B.topRows(left) * in.head(window_size);
-    for (int i = left; i < n - right; ++i) {
-        out(i) = weights.dot(in.segment(i, window_size));
-    }
-    out.tail(right) = B.bottomRows(right) * in.tail(window_size);
 
-    return out;
+std::vector<double> SavitzkyGolayFilter::filter(const std::vector<double>& in) {
+    const size_t n = in.size();
+
+    Eigen::VectorXd in_v =
+        Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned>(in.data(), n);
+    Eigen::VectorXd out_v(n);
+
+    out_v.head(left) = B.topRows(left) * in_v.head(window_size);
+    for (int i = left; i < n - right; ++i) {
+        out_v(i) = weights.dot(in_v.segment(i, window_size));
+    }
+    out_v.tail(right) = B.bottomRows(right) * in_v.tail(window_size);
+
+    return {out_v.data(), out_v.data() + n};
 }
-double SavitzkyGolayFilter::filter_one(const Eigen::Ref<Eigen::VectorXd>& in) {
-    return weights.dot(in);
+double SavitzkyGolayFilter::filter_last_one(const std::vector<double>& in) {
+    Eigen::VectorXd in_v = Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned>(
+        in.data() + in.size() - window_size, window_size);
+    return weights.dot(in_v);
 }

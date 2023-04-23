@@ -36,6 +36,17 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# add_library(sg_filter SHARED src/sg_filter.cpp)
+# set_target_properties(sg_filter PROPERTIES LINKER_LANGUAGE CXX)
+
+# add_library(traj_collector SHARED src/traj_collector.cpp)
+# set_target_properties(traj_collector PROPERTIES LINKER_LANGUAGE CXX)
+
+# ament_export_targets(sg_filter HAS_LIBRARY_TARGET)
+# ament_export_targets(traj_collector HAS_LIBRARY_TARGET)
+
+# ament_export_libraries(sg_filter traj_collector)
+
 ament_package()
 
 include_directories(
@@ -59,8 +70,6 @@ include_directories(
 #   zml
 # )
 
-add_library(sg_filter SHARED src/sg_filter.cpp)
-
 orocos_component(rtt_ros2_zaber_base src/rtt_ros2_zaber_base.cpp)
 target_link_libraries(rtt_ros2_zaber_base
   rtt_ros2::rtt_ros2
@@ -68,15 +77,19 @@ target_link_libraries(rtt_ros2_zaber_base
   zml
 )
 
-orocos_component(rtt_ros2_zaber_auto_insertion src/rtt_ros2_zaber_auto_insertion.cpp)
+orocos_component(rtt_ros2_zaber_auto_insertion 
+  src/rtt_ros2_zaber_auto_insertion.cpp 
+)
 target_link_libraries(rtt_ros2_zaber_auto_insertion
   rtt_ros2_zaber_base
 )
 
-orocos_component(rtt_ros2_zaber_control_reproduce src/rtt_ros2_zaber_control_reproduce.cpp)
+orocos_component(rtt_ros2_zaber_control_reproduce
+  src/rtt_ros2_zaber_control_reproduce.cpp
+  src/sg_filter.cpp
+  src/traj_collector.cpp)
 target_link_libraries(rtt_ros2_zaber_control_reproduce
   rtt_ros2_zaber_base
-  sg_filter
 )
 
 ament_target_dependencies(rtt_ros2_zaber_control_reproduce

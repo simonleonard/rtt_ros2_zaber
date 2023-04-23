@@ -1,10 +1,12 @@
+#include <vector>
+
 #include "Eigen/Dense"
 
 class SavitzkyGolayFilter {
    public:
     SavitzkyGolayFilter(int l, int r, int o);
-    Eigen::VectorXd filter(const Eigen::Ref<Eigen::VectorXd>& in);
-    double filter_one(const Eigen::Ref<Eigen::VectorXd>& in);
+    std::vector<double> filter(const std::vector<double>& in);
+    double filter_last_one(const std::vector<double>& in);
 
    private:
     int left;
