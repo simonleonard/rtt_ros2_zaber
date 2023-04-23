@@ -10,11 +10,12 @@
 RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     const std::string& name)
     : RttRos2ZaberBase(name), state_(State::IDLE), ready_to_reproduce_(false) {
-    addOperation("PrintTipPosition",
-                 &RttRos2ZaberControlReproduce::printTipPosition, this,
-                 RTT::OwnThread);
-    addOperation("PrintJacobian", &RttRos2ZaberControlReproduce::printJacobian,
+    addPort("demo_point", portDemoPoint);
+
+    addOperation("TipPosition", &RttRos2ZaberControlReproduce::printTipPosition,
                  this, RTT::OwnThread);
+    addOperation("Jacobian", &RttRos2ZaberControlReproduce::printJacobian, this,
+                 RTT::OwnThread);
 
     addOperation("AutoInsertion", &RttRos2ZaberControlReproduce::autoInsertion,
                  this, RTT::OwnThread);
@@ -41,8 +42,9 @@ bool RttRos2ZaberControlReproduce::startHook() {
 }
 
 void RttRos2ZaberControlReproduce::updateHook() {
+    geometry_msgs::msg::TransformStamped RxBaseTip;
     try {
-        geometry_msgs::msg::TransformStamped RxBaseTip =
+        RxBaseTip =
             tf_buffer_->lookupTransform("base", "tip", tf2::TimePointZero);
         tip_position_ << RxBaseTip.transform.translation.x * 1000.0,
             RxBaseTip.transform.translation.y * 1000.0,
@@ -54,6 +56,18 @@ void RttRos2ZaberControlReproduce::updateHook() {
     }
 
     joint_states_ << getPositionTX(), getPositionLS(), getPositionTZ();
+
+    needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
+    demo_pt.header.frame_id = "Control";
+    demo_pt.header.stamp = RxBaseTip.header.stamp;
+
+    demo_pt.inputs.tx = joint_states_.x();
+    demo_pt.inputs.ls = joint_states_.y();
+    demo_pt.inputs.tz = joint_states_.z();
+    demo_pt.outputs.x = tip_position_.x();
+    demo_pt.outputs.y = tip_position_.y();
+    demo_pt.outputs.z = tip_position_.z();
+    portDemoPoint.write(demo_pt);
 
     if (state_ == State::DEMO) {
         collect_demo_points();

@@ -21,7 +21,7 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     double getPositionTX();
     double getPositionTZ();
 
-    void printPosition();
+    void printJointPositions();
 
     void MoveRelativeLS(double distance, double velocity);
     void MoveRelativeTX(double distance, double velocity);

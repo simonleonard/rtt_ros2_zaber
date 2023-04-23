@@ -4,17 +4,13 @@
 #include <vector>
 
 #include "Eigen/Dense"
+#include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 #include "rtt_ros2_zaber/sg_filter.hpp"
 #include "rtt_ros2_zaber/traj_collector.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
-
-// struct WayPoint {
-//     Eigen::Vector3d input;
-//     Eigen::Vector3d output;
-// };
 
 class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
    public:
@@ -40,6 +36,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     bool safety_check();
     void update_jacobian();
     void control_loop();
+
+    RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint>
+        portDemoPoint;
 
     State state_;
 

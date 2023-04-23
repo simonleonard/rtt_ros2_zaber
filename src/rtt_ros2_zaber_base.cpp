@@ -23,7 +23,7 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
     addOperation("GetPositionTZ", &RttRos2ZaberBase::getPositionTZ, this,
                  RTT::OwnThread);
 
-    addOperation("PrintPosition", &RttRos2ZaberBase::printPosition, this,
+    addOperation("JointPositions", &RttRos2ZaberBase::printJointPositions, this,
                  RTT::OwnThread);
 
     addOperation("MoveRelativeLS", &RttRos2ZaberBase::MoveRelativeLS, this,
@@ -133,7 +133,7 @@ double RttRos2ZaberBase::getPositionTZ() {
     return templateZ.getPosition(kLenUnitMM) - kTzHome;
 }
 
-void RttRos2ZaberBase::printPosition() {
+void RttRos2ZaberBase::printJointPositions() {
     RTT::log(RTT::Info) << getPositionTX() << " " << getPositionLS() << " "
                         << getPositionTZ() << RTT::endlog();
 }

@@ -36,39 +36,12 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-# add_library(sg_filter SHARED src/sg_filter.cpp)
-# set_target_properties(sg_filter PROPERTIES LINKER_LANGUAGE CXX)
-
-# add_library(traj_collector SHARED src/traj_collector.cpp)
-# set_target_properties(traj_collector PROPERTIES LINKER_LANGUAGE CXX)
-
-# ament_export_targets(sg_filter HAS_LIBRARY_TARGET)
-# ament_export_targets(traj_collector HAS_LIBRARY_TARGET)
-
-# ament_export_libraries(sg_filter traj_collector)
-
 ament_package()
 
 include_directories(
   include
   eigen-3.4.0
 )
-
-# orocos_component(rtt_ros2_zaber src/rtt_ros2_zaber.cpp)
-# target_link_libraries(rtt_ros2_zaber
-#   rtt_ros2::rtt_ros2
-#   rtt_ros2_node::rtt_ros2_node
-#   # rtt_std_msgs_typekit
-#   zml
-#   # rclcpp
-# )
-
-# orocos_component(rtt_ros2_zaber2 src/rtt_ros2_zaber2.cpp)
-# target_link_libraries(rtt_ros2_zaber2
-#   rtt_ros2::rtt_ros2
-#   rtt_ros2_node::rtt_ros2_node
-#   zml
-# )
 
 orocos_component(rtt_ros2_zaber_base src/rtt_ros2_zaber_base.cpp)
 target_link_libraries(rtt_ros2_zaber_base
