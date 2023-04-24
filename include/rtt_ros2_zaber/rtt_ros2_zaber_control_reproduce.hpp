@@ -3,14 +3,10 @@
 #include <queue>
 #include <vector>
 
-#include "Eigen/Dense"
-#include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 #include "rtt_ros2_zaber/sg_filter.hpp"
 #include "rtt_ros2_zaber/traj_collector.hpp"
-#include "tf2_ros/buffer.h"
-#include "tf2_ros/transform_listener.h"
 
 class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
    public:
@@ -22,7 +18,6 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void stopHook() override;
     void cleanupHook() override;
 
-    void printTipPosition() const;
     void printJacobian() const;
 
     void autoInsertion(const std::string& file);
@@ -37,14 +32,11 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void update_jacobian();
     void control_loop();
 
-    RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint>
-        portDemoPoint;
-
     State state_;
 
     // Auto insertion.
-    long insertion_start_time;
-    std::queue<Command> insert_cmds;
+    long insertion_start_time_;
+    std::queue<Command> insert_cmds_;
 
     // Record target way points.
     TrajCollector demo_traj_;
@@ -67,12 +59,6 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     double target_ahead_dis_;  // mm
     double max_control_vel_;
     double error_tolerance_;  // mm
-
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-
-    Eigen::Vector3d joint_states_;
-    Eigen::Vector3d tip_position_;
 };
 
 std::ostream& operator<<(std::ostream& os,

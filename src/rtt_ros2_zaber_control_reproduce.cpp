@@ -10,10 +10,6 @@
 RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     const std::string& name)
     : RttRos2ZaberBase(name), state_(State::IDLE), ready_to_reproduce_(false) {
-    addPort("demo_point", portDemoPoint);
-
-    addOperation("TipPosition", &RttRos2ZaberControlReproduce::printTipPosition,
-                 this, RTT::OwnThread);
     addOperation("Jacobian", &RttRos2ZaberControlReproduce::printJacobian, this,
                  RTT::OwnThread);
 
@@ -21,10 +17,6 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
                  this, RTT::OwnThread);
     addOperation("Reproduce", &RttRos2ZaberControlReproduce::reproduce, this,
                  RTT::OwnThread);
-
-    const auto node = rtt_ros2_node::getNode(this);
-    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node->get_clock());
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     addProperty("max_control_vel", max_control_vel_);
     addProperty("jacobian_update_step", jacobian_update_step_);
@@ -42,32 +34,7 @@ bool RttRos2ZaberControlReproduce::startHook() {
 }
 
 void RttRos2ZaberControlReproduce::updateHook() {
-    geometry_msgs::msg::TransformStamped RxBaseTip;
-    try {
-        RxBaseTip =
-            tf_buffer_->lookupTransform("base", "tip", tf2::TimePointZero);
-        tip_position_ << RxBaseTip.transform.translation.x * 1000.0,
-            RxBaseTip.transform.translation.y * 1000.0,
-            RxBaseTip.transform.translation.z * 1000.0;
-
-    } catch (const tf2::TransformException& ex) {
-        RTT::log(RTT::Error) << "Could not transform base to tip: " << ex.what()
-                             << RTT::endlog();
-    }
-
-    joint_states_ << getPositionTX(), getPositionLS(), getPositionTZ();
-
-    needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
-    demo_pt.header.frame_id = "Control";
-    demo_pt.header.stamp = RxBaseTip.header.stamp;
-
-    demo_pt.inputs.tx = joint_states_.x();
-    demo_pt.inputs.ls = joint_states_.y();
-    demo_pt.inputs.tz = joint_states_.z();
-    demo_pt.outputs.x = tip_position_.x();
-    demo_pt.outputs.y = tip_position_.y();
-    demo_pt.outputs.z = tip_position_.z();
-    portDemoPoint.write(demo_pt);
+    RttRos2ZaberBase::updateHook();
 
     if (state_ == State::DEMO) {
         collect_demo_points();
@@ -82,11 +49,6 @@ void RttRos2ZaberControlReproduce::stopHook() {
 
 void RttRos2ZaberControlReproduce::cleanupHook() {
     RttRos2ZaberBase::cleanupHook();
-}
-
-void RttRos2ZaberControlReproduce::printTipPosition() const {
-    RTT::log(RTT::Info) << tip_position_.x() << " " << tip_position_.y() << " "
-                        << tip_position_.z() << RTT::endlog();
 }
 
 void RttRos2ZaberControlReproduce::printJacobian() const {
@@ -105,11 +67,11 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
     std::string line;
     while (std::getline(infile, line)) {
         Command cmd(line);
-        insert_cmds.push(cmd);
+        insert_cmds_.push(cmd);
     }
 
-    insertion_start_time = rtt_ros2_node::getNode(this)->now().nanoseconds();
-    RTT::log(RTT::Info) << "Insertion start time: " << insertion_start_time
+    insertion_start_time_ = rtt_ros2_node::getNode(this)->now().nanoseconds();
+    RTT::log(RTT::Info) << "Insertion start time: " << insertion_start_time_
                         << RTT::endlog();
 
     demo_traj_.clear();
@@ -122,10 +84,11 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
     demo_traj_.addPoint(joint_states_, tip_position_);
 
     const long curr_time = rtt_ros2_node::getNode(this)->now().nanoseconds();
-    while (!insert_cmds.empty() &&
-           curr_time >= insert_cmds.front().start_time + insertion_start_time) {
-        const auto cmd = insert_cmds.front();
-        insert_cmds.pop();
+    while (!insert_cmds_.empty() &&
+           curr_time >=
+               insert_cmds_.front().start_time + insertion_start_time_) {
+        const auto cmd = insert_cmds_.front();
+        insert_cmds_.pop();
 
         RTT::log(RTT::Info) << cmd.joint << RTT::endlog();
         if (cmd.joint == "LS") {
@@ -196,15 +159,15 @@ bool RttRos2ZaberControlReproduce::safety_check() {
                  tz = templateZ.getPosition(kLenUnitMM);
     if (ls < kLsLowerLimit || ls > kLsUpperLimit || tx < kTxLowerLimit ||
         tx > kTxUpperLimit || tz < kTzLowerLimit || tz > kTzUpperLimit) {
-        RTT::log(RTT::Error)
-            << "Joint out of range! Stopped\n"
-            << "LS = " << ls - kLsHome << " TX = " << tx - kTxHome
-            << " TZ = " << tz - kTzHome << RTT::endlog();
         linearStage.stop();
         templateX.stop();
         templateZ.stop();
         state_ = State::IDLE;
-        RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
+        RTT::log(RTT::Error)
+            << "Joint out of range! Stopped\n"
+            << "LS = " << ls - kLsHome << " TX = " << tx - kTxHome
+            << " TZ = " << tz - kTzHome << "\nSwitch to state: " << state_
+            << RTT::endlog();
         return false;
     }
     return true;
@@ -257,14 +220,12 @@ void RttRos2ZaberControlReproduce::control_loop() {
             templateX.stop();
             templateZ.stop();
 
-            RTT::log(RTT::Info)
-                << "Finished reproducing trajectory." << RTT::endlog();
-            RTT::log(RTT::Info)
-                << "Last target: " << current_target_.transpose()
-                << RTT::endlog();
             state_ = State::IDLE;
+
             RTT::log(RTT::Info)
-                << "Switch to state: " << state_ << RTT::endlog();
+                << "Finished reproducing trajectory.\n"
+                << "Last target: " << current_target_.transpose()
+                << "\nSwitch to state: " << state_ << RTT::endlog();
 
             return;
         }
@@ -283,13 +244,6 @@ void RttRos2ZaberControlReproduce::control_loop() {
     // Update Jacobian.
     update_jacobian();
 
-    RTT::log(RTT::Info) << "Current Target:       "
-                        << current_target_.transpose() << RTT::endlog();
-    RTT::log(RTT::Info) << "Current Tip Position: " << tip_position_.transpose()
-                        << RTT::endlog();
-    RTT::log(RTT::Info) << "Current Joint States: " << joint_states_.transpose()
-                        << RTT::endlog();
-
     // Calculate control input.
     Eigen::Vector3d control_input =
         jacobian_.inverse() * (current_target_ - tip_position_);
@@ -299,10 +253,13 @@ void RttRos2ZaberControlReproduce::control_loop() {
     templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
     linearStage.moveVelocity(control_input.y(), kVelUnitMMPS);
     templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
-    RTT::log(RTT::Info) << "Control inputs:       " << control_input.transpose()
-                        << RTT::endlog();
 
-    std::cout << std::endl;
+    RTT::log(RTT::Info)
+        << "Current Target:       " << current_target_.transpose()
+        << "\nCurrent Tip Position: " << tip_position_.transpose()
+        << "\nCurrent Joint States: " << joint_states_.transpose()
+        << "\nControl inputs:       " << control_input.transpose() << "\n"
+        << RTT::endlog();
 }
 
 std::ostream& operator<<(std::ostream& os,

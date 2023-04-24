@@ -1,11 +1,18 @@
 #pragma once
+#include <tf2/transform_datatypes.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <zaber/motion/ascii.h>
 
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rtt/InputPort.hpp>
 #include <rtt/OutputPort.hpp>
 #include <rtt/TaskContext.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <string>
+
+#include "Eigen/Dense"
+#include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 
 class RttRos2ZaberBase : public RTT::TaskContext {
    public:
@@ -22,6 +29,7 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     double getPositionTZ();
 
     void printJointPositions();
+    void printTipPosition() const;
 
     void MoveRelativeLS(double distance, double velocity);
     void MoveRelativeTX(double distance, double velocity);
@@ -34,6 +42,12 @@ class RttRos2ZaberBase : public RTT::TaskContext {
 
    protected:
     void setHome();
+    bool lookUpTransform(const std::string& target, const std::string& source,
+                         tf2::Transform& output, double time_out = 0.0);
+
+    void start_calibrate(double duration /* s */);
+    void calibration();
+    bool clear_calibration();
 
     // serial port device file
     std::string device_file;
@@ -50,12 +64,18 @@ class RttRos2ZaberBase : public RTT::TaskContext {
 
     zaber::motion::ascii::Connection connection;
 
-    long oldTime;
+    RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint>
+        port_demo_point_;
 
-    double oldPoseLS;
-    double oldPoseTX;
-    double oldPoseTZ;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
-    RTT::OutputPort<sensor_msgs::msg::JointState> portGetJointState;
-    sensor_msgs::msg::JointState js;
+    Eigen::Vector3d joint_states_;
+    Eigen::Vector3d tip_position_;
+
+    Eigen::Transform<double, 3, Eigen::Isometry> transform_offset_;
+
+    long calibration_end_time_;
+    bool calibrating_;
+    std::vector<Eigen::Vector3d> calibration_points_;
 };

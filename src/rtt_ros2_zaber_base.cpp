@@ -1,9 +1,14 @@
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 
+#include <tf2/convert.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+#include <cmath>
 #include <rtt/Component.hpp>
 #include <rtt/internal/GlobalService.hpp>
 #include <rtt_ros2_node/rtt_ros2_node.hpp>
 
+#include "Eigen/Core"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_constants.hpp"
 
 RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
@@ -14,7 +19,7 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
     create_node.ready();
     create_node(name);
 
-    addPort("joint_state", portGetJointState);
+    addPort("demo_point", port_demo_point_);
 
     addOperation("GetPositionLS", &RttRos2ZaberBase::getPositionLS, this,
                  RTT::OwnThread);
@@ -24,6 +29,8 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
                  RTT::OwnThread);
 
     addOperation("JointPositions", &RttRos2ZaberBase::printJointPositions, this,
+                 RTT::OwnThread);
+    addOperation("TipPosition", &RttRos2ZaberBase::printTipPosition, this,
                  RTT::OwnThread);
 
     addOperation("MoveRelativeLS", &RttRos2ZaberBase::MoveRelativeLS, this,
@@ -40,8 +47,15 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
                  RTT::OwnThread);
 
     addOperation("Home", &RttRos2ZaberBase::home, this, RTT::OwnThread);
-
+    addOperation("Calibrate", &RttRos2ZaberBase::start_calibrate, this,
+                 RTT::OwnThread);
+    addOperation("ClearCalibration", &RttRos2ZaberBase::clear_calibration, this,
+                 RTT::OwnThread);
     addProperty("device_file", device_file);
+
+    const auto node = rtt_ros2_node::getNode(this);
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     zaber::motion::Library::enableDeviceDbStore();
 }
@@ -69,52 +83,43 @@ bool RttRos2ZaberBase::RttRos2ZaberBase::configureHook() {
 }
 
 bool RttRos2ZaberBase::startHook() {
-    std::cout << "Started startHook" << std::endl;
-
-    oldPoseLS = getPositionLS();
-    oldPoseTX = getPositionTX();
-    oldPoseTZ = getPositionTZ();
-
-    oldTime = rtt_ros2_node::getNode(this)->now().nanoseconds();
-
+    if (!clear_calibration()) return false;
     return true;
 }
 
 void RttRos2ZaberBase::updateHook() {
-    const auto timestamp = rtt_ros2_node::getNode(this)->now();
-    const long curr_time = timestamp.nanoseconds();
+    tf2::Transform rx_base_tip;
+    if (!lookUpTransform("base", "tip", rx_base_tip)) return;
 
-    const double qLS = getPositionLS();
-    const double qTX = getPositionTX();
-    const double qTZ = getPositionTZ();
+    tf2::Vector3 curr_tip_position = 1000.0 * rx_base_tip.getOrigin();
+    tip_position_ << curr_tip_position[0], curr_tip_position[1],
+        curr_tip_position[2];
+    tip_position_ = transform_offset_ * tip_position_;
 
-    const double qdLS =
-        (qLS - oldPoseLS) * (pow(10, 9)) / (curr_time - oldTime);
-    const double qdTX =
-        (qTX - oldPoseTX) * (pow(10, 9)) / (curr_time - oldTime);
-    const double qdTZ =
-        (qTZ - oldPoseTZ) * (pow(10, 9)) / (curr_time - oldTime);
+    joint_states_ << getPositionTX(), getPositionLS(), getPositionTZ();
 
-    oldPoseLS = qLS;
-    oldPoseTX = qTX;
-    oldPoseTZ = qTZ;
+    needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
+    demo_pt.header.frame_id = "Control";
+    demo_pt.header.stamp = rtt_ros2_node::getNode(this)->now();
 
-    oldTime = curr_time;
+    demo_pt.inputs.tx = joint_states_.x();
+    demo_pt.inputs.ls = joint_states_.y();
+    demo_pt.inputs.tz = joint_states_.z();
+    demo_pt.outputs.x = tip_position_.x();
+    demo_pt.outputs.y = tip_position_.y();
+    demo_pt.outputs.z = tip_position_.z();
+    port_demo_point_.write(demo_pt);
 
-    js.name.push_back("linearStage");
-    js.position.push_back(qLS);
-    js.velocity.push_back(qdLS);
-
-    js.name.push_back("templateX");
-    js.position.push_back(qTX);
-    js.velocity.push_back(qdTX);
-
-    js.name.push_back("templateZ");
-    js.position.push_back(qTZ);
-    js.velocity.push_back(qdTZ);
-
-    js.header.stamp = timestamp;
-    portGetJointState.write(js);
+    if (calibrating_) {
+        if (rtt_ros2_node::getNode(this)->now().nanoseconds() >=
+            calibration_end_time_) {
+            calibrating_ = false;
+            linearStage.stop();
+            calibration();
+        } else {
+            calibration_points_.push_back(tip_position_);
+        }
+    }
 }
 
 void RttRos2ZaberBase::stopHook() { std::cout << "stopHook" << std::endl; }
@@ -136,6 +141,11 @@ double RttRos2ZaberBase::getPositionTZ() {
 void RttRos2ZaberBase::printJointPositions() {
     RTT::log(RTT::Info) << getPositionTX() << " " << getPositionLS() << " "
                         << getPositionTZ() << RTT::endlog();
+}
+
+void RttRos2ZaberBase::printTipPosition() const {
+    RTT::log(RTT::Info) << tip_position_.x() << " " << tip_position_.y() << " "
+                        << tip_position_.z() << RTT::endlog();
 }
 
 void RttRos2ZaberBase::MoveRelativeLS(double distance, double velocity) {
@@ -235,6 +245,23 @@ void RttRos2ZaberBase::MoveAbsoluteTZ(double pose, double velocity,
 
 void RttRos2ZaberBase::home() { setHome(); }
 
+bool RttRos2ZaberBase::lookUpTransform(const std::string& target,
+                                       const std::string& source,
+                                       tf2::Transform& output,
+                                       double time_out) {
+    geometry_msgs::msg::TransformStamped rx_stamped;
+    try {
+        rx_stamped = tf_buffer_->lookupTransform(
+            target, source, tf2::TimePointZero, tf2::durationFromSec(time_out));
+        tf2::fromMsg(rx_stamped.transform, output);
+    } catch (const tf2::TransformException& ex) {
+        RTT::log(RTT::Error) << "Could not transform" << source << " to "
+                             << target << ex.what() << RTT::endlog();
+        return false;
+    }
+    return true;
+}
+
 void RttRos2ZaberBase::setHome() {
     templateX.moveAbsolute(kTxHome, kLenUnitMM, true /* waitUntilIdle */,
                            kDefaultVel, kVelUnitMMPS);
@@ -242,6 +269,69 @@ void RttRos2ZaberBase::setHome() {
                            kDefaultVel, kVelUnitMMPS);
     linearStage.moveAbsolute(kLsHome, kLenUnitMM, true /* waitUntilIdle */,
                              kDefaultVel, kVelUnitMMPS);
+}
+
+void RttRos2ZaberBase::start_calibrate(double duration) {
+    setHome();
+    RTT::log(RTT::Info) << "Calibrating..." << RTT::endlog();
+    calibration_end_time_ = rtt_ros2_node::getNode(this)->now().nanoseconds() +
+                            duration * 1000000000;
+    calibration_points_.clear();
+    linearStage.moveVelocity(kDefaultVel, kVelUnitMMPS);
+    calibrating_ = true;
+}
+
+void RttRos2ZaberBase::calibration() {
+    setHome();
+    size_t n = calibration_points_.size();
+    Eigen::Matrix<Eigen::Vector3d::Scalar, Eigen::Dynamic, Eigen::Dynamic>
+        points(n, 3);
+    for (size_t i = 0; i < n; ++i) points.row(i) = calibration_points_[i];
+
+    Eigen::Vector3d origin = points.colwise().mean();
+    Eigen::MatrixXd centered = points.rowwise() - origin.transpose();
+    Eigen::MatrixXd cov = centered.adjoint() * centered;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(cov);
+    Eigen::Vector3d new_y = eig.eigenvectors().col(2).normalized();
+
+    RTT::log(RTT ::Info) << "Insertion direction: \n"
+                         << new_y.transpose() << RTT::endlog();
+
+    Eigen::Vector3d rot_axis = Eigen::Vector3d::UnitY().cross(new_y).normalized();
+    const double angle = std::acos(Eigen::Vector3d::UnitY().dot(new_y));
+
+    tf2::Transform rx_base_tip;
+    if (!lookUpTransform("base", "tip", rx_base_tip, 5.0)) return;
+
+    tf2::Vector3 curr_tip_position = 1000.0 * rx_base_tip.getOrigin();
+    tip_position_ << curr_tip_position[0], curr_tip_position[1],
+        curr_tip_position[2];
+
+    transform_offset_ = Eigen::Translation3d(tip_position_) *
+                        Eigen::AngleAxis<double>(angle, rot_axis);
+
+    transform_offset_ = transform_offset_.inverse();
+    RTT::log(RTT ::Info) << "\nTransform offset:\n"
+                         << transform_offset_.matrix() << RTT::endlog();
+    RTT::log(RTT::Info) << "Finished calibration" << RTT::endlog();
+}
+
+bool RttRos2ZaberBase::clear_calibration() {
+    setHome();
+
+    tf2::Transform rx_base_tip;
+    if (!lookUpTransform("base", "tip", rx_base_tip, 5.0)) return false;
+
+    tf2::Vector3 curr_tip_position = 1000.0 * rx_base_tip.getOrigin();
+    tip_position_ << curr_tip_position[0], curr_tip_position[1],
+        curr_tip_position[2];
+
+    transform_offset_ = Eigen::Translation3d(tip_position_);
+    transform_offset_ = transform_offset_.inverse();
+
+    RTT::log(RTT ::Info) << "Transform offset:\n"
+                         << transform_offset_.matrix() << RTT::endlog();
+    return true;
 }
 
 ORO_CREATE_COMPONENT(RttRos2ZaberBase)
