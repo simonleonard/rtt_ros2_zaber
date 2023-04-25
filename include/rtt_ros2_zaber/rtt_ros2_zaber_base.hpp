@@ -41,7 +41,7 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     void home();
 
    protected:
-    void setHome();
+    void setHome(bool wait_until_idle = false);
     bool lookUpTransform(const std::string& target, const std::string& source,
                          tf2::Transform& output, double time_out = 0.0);
 

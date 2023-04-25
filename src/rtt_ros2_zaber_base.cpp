@@ -77,7 +77,7 @@ bool RttRos2ZaberBase::RttRos2ZaberBase::configureHook() {
     templateX = deviceTX.getAxis(1);
     templateZ = deviceTZ.getAxis(1);
 
-    setHome();
+    setHome(true /* waitUntilIdle */);
 
     return true;
 }
@@ -117,14 +117,21 @@ void RttRos2ZaberBase::updateHook() {
             linearStage.stop();
             calibration();
         } else {
-            calibration_points_.push_back(tip_position_);
+            tf2::Transform rx_base_handle;
+            if (!lookUpTransform("base", "handle", rx_base_handle)) return;
+            tf2::Vector3 curr_handle_position =
+                1000.0 * rx_base_handle.getOrigin();
+            Eigen::Vector3d handle_pos;
+            handle_pos << curr_tip_position[0], curr_tip_position[1],
+                curr_tip_position[2];
+            calibration_points_.push_back(handle_pos);
         }
     }
 }
 
 void RttRos2ZaberBase::stopHook() { std::cout << "stopHook" << std::endl; }
 
-void RttRos2ZaberBase::cleanupHook() { setHome(); }
+void RttRos2ZaberBase::cleanupHook() { setHome(true /* waitUntilIdle */); }
 
 double RttRos2ZaberBase::getPositionLS() {
     return linearStage.getPosition(kLenUnitMM) - kLsHome;
@@ -262,17 +269,18 @@ bool RttRos2ZaberBase::lookUpTransform(const std::string& target,
     return true;
 }
 
-void RttRos2ZaberBase::setHome() {
-    templateX.moveAbsolute(kTxHome, kLenUnitMM, true /* waitUntilIdle */,
-                           kDefaultVel, kVelUnitMMPS);
-    templateZ.moveAbsolute(kTzHome, kLenUnitMM, true /* waitUntilIdle */,
-                           kDefaultVel, kVelUnitMMPS);
-    linearStage.moveAbsolute(kLsHome, kLenUnitMM, true /* waitUntilIdle */,
-                             kDefaultVel, kVelUnitMMPS);
+void RttRos2ZaberBase::setHome(bool wait_until_idle) {
+    templateX.moveAbsolute(kTxHome, kLenUnitMM, wait_until_idle, kDefaultVel,
+                           kVelUnitMMPS);
+    templateZ.moveAbsolute(kTzHome, kLenUnitMM, wait_until_idle, kDefaultVel,
+                           kVelUnitMMPS);
+    linearStage.moveAbsolute(kLsHome, kLenUnitMM, wait_until_idle, kDefaultVel,
+                             kVelUnitMMPS);
 }
 
 void RttRos2ZaberBase::start_calibrate(double duration) {
-    setHome();
+    setHome(true /* waitUntilIdle */);
+
     RTT::log(RTT::Info) << "Calibrating..." << RTT::endlog();
     calibration_end_time_ = rtt_ros2_node::getNode(this)->now().nanoseconds() +
                             duration * 1000000000;
@@ -282,7 +290,7 @@ void RttRos2ZaberBase::start_calibrate(double duration) {
 }
 
 void RttRos2ZaberBase::calibration() {
-    setHome();
+    setHome(true /* waitUntilIdle */);
     size_t n = calibration_points_.size();
     Eigen::Matrix<Eigen::Vector3d::Scalar, Eigen::Dynamic, Eigen::Dynamic>
         points(n, 3);
@@ -297,7 +305,8 @@ void RttRos2ZaberBase::calibration() {
     RTT::log(RTT ::Info) << "Insertion direction: \n"
                          << new_y.transpose() << RTT::endlog();
 
-    Eigen::Vector3d rot_axis = Eigen::Vector3d::UnitY().cross(new_y).normalized();
+    Eigen::Vector3d rot_axis =
+        Eigen::Vector3d::UnitY().cross(new_y).normalized();
     const double angle = std::acos(Eigen::Vector3d::UnitY().dot(new_y));
 
     tf2::Transform rx_base_tip;
@@ -317,7 +326,7 @@ void RttRos2ZaberBase::calibration() {
 }
 
 bool RttRos2ZaberBase::clear_calibration() {
-    setHome();
+    setHome(true /* waitUntilIdle */);
 
     tf2::Transform rx_base_tip;
     if (!lookUpTransform("base", "tip", rx_base_tip, 5.0)) return false;

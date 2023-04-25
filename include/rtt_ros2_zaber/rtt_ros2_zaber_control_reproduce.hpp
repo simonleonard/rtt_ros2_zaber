@@ -19,9 +19,11 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void cleanupHook() override;
 
     void printJacobian() const;
+    void setJacobian(const std::vector<double>& j);
 
     void autoInsertion(const std::string& file);
     void reproduce(const std::string& experiment);
+
 
     enum class State { IDLE, DEMO, CONTROL };
 
@@ -47,6 +49,7 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     TrajCollector reproduce_traj_;
 
     bool sg_filtering_;
+    bool demo_points_filtered_;
     std::unique_ptr<SavitzkyGolayFilter> filter;
 
     Eigen::Vector3d current_target_;

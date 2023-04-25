@@ -12,6 +12,8 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     : RttRos2ZaberBase(name), state_(State::IDLE), ready_to_reproduce_(false) {
     addOperation("Jacobian", &RttRos2ZaberControlReproduce::printJacobian, this,
                  RTT::OwnThread);
+    addOperation("SetJacobian", &RttRos2ZaberControlReproduce::setJacobian,
+                 this, RTT::OwnThread);
 
     addOperation("AutoInsertion", &RttRos2ZaberControlReproduce::autoInsertion,
                  this, RTT::OwnThread);
@@ -26,6 +28,7 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
+    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
     return RttRos2ZaberBase::configureHook();
 }
 
@@ -52,7 +55,14 @@ void RttRos2ZaberControlReproduce::cleanupHook() {
 }
 
 void RttRos2ZaberControlReproduce::printJacobian() const {
-    RTT::log(RTT::Info) << jacobian_ << RTT::endlog();
+    RTT::log(RTT::Info)
+        << "Jacobian:\n########################################\n"
+        << jacobian_ << "\n########################################\n"
+        << RTT::endlog();
+}
+
+void RttRos2ZaberControlReproduce::setJacobian(const std::vector<double>& j) {
+    jacobian_ << j[0], j[1], j[2], j[3], j[4], j[5], j[6], j[7], j[8];
 }
 
 void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
@@ -78,6 +88,8 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
 
     state_ = State::DEMO;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
+
+    demo_points_filtered_ = false;
 }
 
 void RttRos2ZaberControlReproduce::collect_demo_points() {
@@ -134,9 +146,11 @@ void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
 
     prev_tip_position_ = tip_position_;
     prev_joint_states_ = joint_states_;
-    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
 
-    if (sg_filtering_) {
+    printJacobian();
+
+    if (sg_filtering_ && !demo_points_filtered_) {
+        demo_points_filtered_ = true;
         filter.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2,
                                              (kSGFilterWindow - 1) / 2,
                                              kSGFilterOrder));
@@ -182,13 +196,10 @@ void RttRos2ZaberControlReproduce::update_jacobian() {
         jacobian_ =
             jacobian_ + (dy - jacobian_ * dx) * dx.transpose() / dx_norm_2;
 
-        RTT::log(RTT::Info)
-            << "Jacobian:\n########################################\n"
-            << jacobian_ << "\n########################################\n"
-            << RTT::endlog();
+        printJacobian();
 
         // Update previous way point.
-        prev_joint_states_ = prev_joint_states_;
+        prev_joint_states_ = joint_states_;
         prev_tip_position_ = tip_position_;
     }
 }
@@ -196,16 +207,19 @@ void RttRos2ZaberControlReproduce::update_jacobian() {
 void RttRos2ZaberControlReproduce::control_loop() {
     reproduce_traj_.addPoint(joint_states_, tip_position_);
 
-    if (sg_filtering_) {
-        if (reproduce_traj_.size() < kSGFilterWindow) {
-            RTT::log(RTT::Info)
-                << "Accumulating measurements..." << RTT::endlog();
-            return;
+    /*
+        if (sg_filtering_) {
+            if (reproduce_traj_.size() < kSGFilterWindow) {
+                RTT::log(RTT::Info)
+                    << "Accumulating measurements..." << RTT::endlog();
+                return;
+            }
+            tip_position_.x() =
+       filter->filter_last_one(reproduce_traj_.tip_x()); tip_position_.y() =
+       filter->filter_last_one(reproduce_traj_.tip_y()); tip_position_.z() =
+       filter->filter_last_one(reproduce_traj_.tip_z());
         }
-        tip_position_.x() = filter->filter_last_one(reproduce_traj_.tip_x());
-        tip_position_.y() = filter->filter_last_one(reproduce_traj_.tip_y());
-        tip_position_.z() = filter->filter_last_one(reproduce_traj_.tip_z());
-    }
+    */
 
     // Stop of joint limits out of ranges.
     if (!safety_check()) return;
@@ -223,9 +237,12 @@ void RttRos2ZaberControlReproduce::control_loop() {
             state_ = State::IDLE;
 
             RTT::log(RTT::Info)
-                << "Finished reproducing trajectory.\n"
-                << "Last target: " << current_target_.transpose()
+                << "Finished reproducing trajectory."
+                << "\nLast target: " << current_target_.transpose()
+                << "\nTip position: " << tip_position_.transpose()
                 << "\nSwitch to state: " << state_ << RTT::endlog();
+
+            jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
 
             return;
         }
@@ -245,9 +262,13 @@ void RttRos2ZaberControlReproduce::control_loop() {
     update_jacobian();
 
     // Calculate control input.
-    Eigen::Vector3d control_input =
-        jacobian_.inverse() * (current_target_ - tip_position_);
+    Eigen::Vector3d error = current_target_ - tip_position_;
+    error = (error.cwiseAbs().array() < error_tolerance_).select(0.0, error);
+    Eigen::Vector3d control_input = jacobian_.inverse() * error;
     control_input *= max_control_vel_ / control_input.norm();
+
+    control_input.x() = std::max(std::min(control_input.x(), 0.3), -0.3);
+    control_input.z() = std::max(std::min(control_input.z(), 0.3), -0.3);
 
     // Send velocities.
     templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
@@ -255,10 +276,11 @@ void RttRos2ZaberControlReproduce::control_loop() {
     templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
 
     RTT::log(RTT::Info)
-        << "Current Target:       " << current_target_.transpose()
+        << "\nCurrent Target:       " << current_target_.transpose()
         << "\nCurrent Tip Position: " << tip_position_.transpose()
+        << "\nError vector        : " << error.transpose()
         << "\nCurrent Joint States: " << joint_states_.transpose()
-        << "\nControl inputs:       " << control_input.transpose() << "\n"
+        << "\nControl inputs:       " << control_input.transpose()
         << RTT::endlog();
 }
 
