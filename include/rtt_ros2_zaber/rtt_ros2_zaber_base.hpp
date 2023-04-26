@@ -10,7 +10,6 @@
 #include <rtt/TaskContext.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <string>
-
 #include "Eigen/Dense"
 #include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 
@@ -43,7 +42,9 @@ class RttRos2ZaberBase : public RTT::TaskContext {
    protected:
     void setHome(bool wait_until_idle = false);
     bool lookUpTransform(const std::string& target, const std::string& source,
-                         tf2::Transform& output, double time_out = 0.0);
+                         tf2::Transform& output,
+                         const rclcpp::Time time = rclcpp::Time(0),
+                         double time_out = 0.0);
 
     void start_calibrate(double duration /* s */);
     void calibration();

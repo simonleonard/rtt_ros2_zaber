@@ -24,14 +24,17 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void autoInsertion(const std::string& file);
     void reproduce(const std::string& experiment);
 
-
     enum class State { IDLE, DEMO, CONTROL };
 
    private:
     void collect_demo_points();
 
     bool safety_check();
+
+    bool update_target();
     void update_jacobian();
+    void send_control_vels();
+
     void control_loop();
 
     State state_;
@@ -57,11 +60,14 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     Eigen::Vector3d prev_joint_states_;
     Eigen::Vector3d prev_tip_position_;
     Eigen::Matrix3d jacobian_;
-    double jacobian_update_step_;  // mm
+    double jacobian_update_step_;         // mm
+    double jacobian_update_step_square_;  // mm^2
 
     double target_ahead_dis_;  // mm
     double max_control_vel_;
     double error_tolerance_;  // mm
+
+    double prev_time_;
 };
 
 std::ostream& operator<<(std::ostream& os,

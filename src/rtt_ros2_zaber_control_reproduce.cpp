@@ -28,11 +28,13 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
-    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
     return RttRos2ZaberBase::configureHook();
 }
 
 bool RttRos2ZaberControlReproduce::startHook() {
+    jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
+    jacobian_update_step_square_ =
+        jacobian_update_step_ * jacobian_update_step_;
     return RttRos2ZaberBase::startHook();
 }
 
@@ -46,9 +48,7 @@ void RttRos2ZaberControlReproduce::updateHook() {
     }
 }
 
-void RttRos2ZaberControlReproduce::stopHook() {
-    RTT::log(RTT::Info) << "stopHook" << RTT::endlog();
-}
+void RttRos2ZaberControlReproduce::stopHook() { RttRos2ZaberBase::stopHook(); }
 
 void RttRos2ZaberControlReproduce::cleanupHook() {
     RttRos2ZaberBase::cleanupHook();
@@ -146,6 +146,7 @@ void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
 
     prev_tip_position_ = tip_position_;
     prev_joint_states_ = joint_states_;
+    prev_time_ = rtt_ros2_node::getNode(this)->now().nanoseconds() / 1.0e9;
 
     printJacobian();
 
@@ -162,6 +163,8 @@ void RttRos2ZaberControlReproduce::reproduce(const std::string& experiment) {
     }
 
     current_target_ = demo_traj_itr_->current_outputs();
+    update_target();
+    send_control_vels();
 
     state_ = State::CONTROL;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
@@ -187,21 +190,95 @@ bool RttRos2ZaberControlReproduce::safety_check() {
     return true;
 }
 
-void RttRos2ZaberControlReproduce::update_jacobian() {
-    if ((tip_position_ - prev_tip_position_).norm() > jacobian_update_step_) {
-        Eigen::Vector3d dx = joint_states_ - prev_joint_states_;
-        Eigen::Vector3d dy = tip_position_ - prev_tip_position_;
+bool RttRos2ZaberControlReproduce::update_target() {
+    // Update target.
+    if ((current_target_.y() < tip_position_.y() ||
+         (current_target_ - tip_position_).cwiseAbs().maxCoeff() <
+             error_tolerance_)) {
+        // Stop if no target left.
+        if (demo_traj_itr_->isDone()) {
+            linearStage.stop();
+            templateX.stop();
+            templateZ.stop();
 
-        const double dx_norm_2 = dx.transpose() * dx;
-        jacobian_ =
-            jacobian_ + (dy - jacobian_ * dx) * dx.transpose() / dx_norm_2;
+            state_ = State::IDLE;
 
-        printJacobian();
+            RTT::log(RTT::Info)
+                << "Finished reproducing trajectory."
+                << "\nLast target: " << current_target_.transpose()
+                << "\nTip position: " << tip_position_.transpose()
+                << "\nSwitch to state: " << state_ << RTT::endlog();
 
-        // Update previous way point.
-        prev_joint_states_ = joint_states_;
-        prev_tip_position_ = tip_position_;
+            jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
+
+            return false;
+        }
+
+        while (!demo_traj_itr_->isDone() &&
+               (demo_traj_itr_->current_outputs() - current_target_).norm() <
+                   target_ahead_dis_) {
+            demo_traj_itr_->next();
+        }
+
+        current_target_ = demo_traj_itr_->isDone()
+                              ? demo_traj_itr_->last_outputs()
+                              : demo_traj_itr_->current_outputs();
+        return true;
     }
+    return false;
+}
+
+void RttRos2ZaberControlReproduce::update_jacobian() {
+    Eigen::Vector3d dx = joint_states_ - prev_joint_states_;
+    Eigen::Vector3d dy = tip_position_ - prev_tip_position_;
+    const double dx_norm_square = dx.transpose() * dx;
+    jacobian_ =
+        jacobian_ + (dy - jacobian_ * dx) * dx.transpose() / dx_norm_square;
+
+    printJacobian();
+
+    // Update previous way point.
+    prev_joint_states_ = joint_states_;
+    prev_tip_position_ = tip_position_;
+}
+
+void RttRos2ZaberControlReproduce::send_control_vels() {
+    // Calculate control input.
+    Eigen::Vector3d error = current_target_ - tip_position_;
+    error = (error.cwiseAbs().array() < error_tolerance_).select(0.0, error);
+    Eigen::Vector3d control_input = jacobian_.inverse() * error;
+    control_input *= max_control_vel_ / control_input.norm();
+
+    control_input.x() =
+        (error.x() == 0.0 ? 0.0
+                          : std::max(std::min(control_input.x(), 0.3), -0.3));
+    // control_input.y() = std::max(control_input.y(), 0.3);
+    control_input.z() =
+        (error.z() == 0.0 ? 0.0
+                          : std::max(std::min(control_input.z(), 0.3), -0.3));
+
+    const double time =
+        rtt_ros2_node::getNode(this)->now().nanoseconds() / 1.0e9;
+
+    RTT::log(RTT::Info)
+        << "\nCurrent Target:        " << current_target_.transpose()
+        << "\nCurrent Tip Position:  " << tip_position_.transpose()
+        << "\nError vector        :  " << error.transpose()
+        << "\nCurrent Joint States:  " << joint_states_.transpose()
+        << "\nControl inputs:        " << control_input.transpose()
+        << "\nDelta t:               " << time - prev_time_ << RTT::endlog();
+    prev_time_ = time;
+
+    // Send velocities.
+    if (control_input.x() != 0.0)
+        templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
+    else
+        templateX.stop();
+    linearStage.moveVelocity(control_input.y(), kVelUnitMMPS);
+    if (control_input.z() != 0.0)
+        templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
+    else
+        templateZ.stop();
 }
 
 void RttRos2ZaberControlReproduce::control_loop() {
@@ -224,64 +301,10 @@ void RttRos2ZaberControlReproduce::control_loop() {
     // Stop of joint limits out of ranges.
     if (!safety_check()) return;
 
-    // Update target.
-    while ((current_target_.y() < tip_position_.y() ||
-            (current_target_ - tip_position_).cwiseAbs().maxCoeff() <
-                error_tolerance_)) {
-        // Stop if no target left.
-        if (demo_traj_itr_->isDone()) {
-            linearStage.stop();
-            templateX.stop();
-            templateZ.stop();
-
-            state_ = State::IDLE;
-
-            RTT::log(RTT::Info)
-                << "Finished reproducing trajectory."
-                << "\nLast target: " << current_target_.transpose()
-                << "\nTip position: " << tip_position_.transpose()
-                << "\nSwitch to state: " << state_ << RTT::endlog();
-
-            jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
-
-            return;
-        }
-
-        while (!demo_traj_itr_->isDone() &&
-               (demo_traj_itr_->current_outputs() - current_target_).norm() <
-                   target_ahead_dis_) {
-            demo_traj_itr_->next();
-        }
-
-        current_target_ = demo_traj_itr_->isDone()
-                              ? demo_traj_itr_->last_outputs()
-                              : demo_traj_itr_->current_outputs();
+    if (update_target()) {
+        update_jacobian();
+        send_control_vels();
     }
-
-    // Update Jacobian.
-    update_jacobian();
-
-    // Calculate control input.
-    Eigen::Vector3d error = current_target_ - tip_position_;
-    error = (error.cwiseAbs().array() < error_tolerance_).select(0.0, error);
-    Eigen::Vector3d control_input = jacobian_.inverse() * error;
-    control_input *= max_control_vel_ / control_input.norm();
-
-    control_input.x() = std::max(std::min(control_input.x(), 0.3), -0.3);
-    control_input.z() = std::max(std::min(control_input.z(), 0.3), -0.3);
-
-    // Send velocities.
-    templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
-    linearStage.moveVelocity(control_input.y(), kVelUnitMMPS);
-    templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
-
-    RTT::log(RTT::Info)
-        << "\nCurrent Target:       " << current_target_.transpose()
-        << "\nCurrent Tip Position: " << tip_position_.transpose()
-        << "\nError vector        : " << error.transpose()
-        << "\nCurrent Joint States: " << joint_states_.transpose()
-        << "\nControl inputs:       " << control_input.transpose()
-        << RTT::endlog();
 }
 
 std::ostream& operator<<(std::ostream& os,

@@ -3,6 +3,7 @@
 #include <tf2/convert.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include <chrono>
 #include <cmath>
 #include <rtt/Component.hpp>
 #include <rtt/internal/GlobalService.hpp>
@@ -63,11 +64,19 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
 bool RttRos2ZaberBase::RttRos2ZaberBase::configureHook() {
     RTT::log().setLogLevel(RTT::Logger::Info);
 
-    connection = zaber::motion::ascii::Connection::openSerialPort(device_file);
+    try {
+        connection =
+            zaber::motion::ascii::Connection::openSerialPort(device_file);
+    } catch (const std::exception& exc) {
+        RTT::log(RTT::Info)
+            << "Failed to open serial port: " << exc.what() << RTT::endlog();
+        return false;
+    }
 
     std::vector<zaber::motion::ascii::Device> deviceList =
         connection.detectDevices();
-    std::cout << "Found " << deviceList.size() << " device." << std::endl;
+    RTT::log(RTT::Info) << "Found " << deviceList.size() << " device."
+                        << RTT::endlog();
 
     deviceLS = deviceList[0];
     deviceTX = deviceList[1];
@@ -122,16 +131,22 @@ void RttRos2ZaberBase::updateHook() {
             tf2::Vector3 curr_handle_position =
                 1000.0 * rx_base_handle.getOrigin();
             Eigen::Vector3d handle_pos;
-            handle_pos << curr_tip_position[0], curr_tip_position[1],
-                curr_tip_position[2];
+            handle_pos << curr_handle_position[0], curr_handle_position[1],
+                curr_handle_position[2];
             calibration_points_.push_back(handle_pos);
         }
     }
 }
 
-void RttRos2ZaberBase::stopHook() { std::cout << "stopHook" << std::endl; }
+void RttRos2ZaberBase::stopHook() {
+    RTT::log(RTT::Info) << "stopHook" << RTT::endlog();
+    setHome(true /* waitUntilIdle */);
+}
 
-void RttRos2ZaberBase::cleanupHook() { setHome(true /* waitUntilIdle */); }
+void RttRos2ZaberBase::cleanupHook() {
+    RTT::log(RTT::Info) << "cleanupHook" << RTT::endlog();
+    setHome(true /* waitUntilIdle */);
+}
 
 double RttRos2ZaberBase::getPositionLS() {
     return linearStage.getPosition(kLenUnitMM) - kLsHome;
@@ -163,7 +178,8 @@ void RttRos2ZaberBase::MoveRelativeLS(double distance, double velocity) {
                 kLsLowerLimit) ||
                ((linearStage.getPosition(kLenUnitMM) + distance) >
                 kLsUpperLimit)) {
-        std::cout << "LinearStage pose: " << getPositionLS() << std::endl;
+        RTT::log(RTT::Info)
+            << "LinearStage pose: " << getPositionLS() << RTT::endlog();
         throw std::invalid_argument(
             "Device cannot recede beyond the origin 0mm and cannot exceed "
             "above 100mm");
@@ -181,7 +197,8 @@ void RttRos2ZaberBase::MoveRelativeTX(double distance, double velocity) {
                 kTxLowerLimit) ||
                ((templateX.getPosition(kLenUnitMM) + distance) >
                 kTxUpperLimit)) {
-        std::cout << "Template x-axis: " << getPositionTX() << std::endl;
+        RTT::log(RTT::Info)
+            << "Template x-axis: " << getPositionTX() << RTT::endlog();
         throw std::invalid_argument(
             "Relative move for template along x-axis is out of bound, {-5,5}");
     } else {
@@ -198,7 +215,8 @@ void RttRos2ZaberBase::MoveRelativeTZ(double distance, double velocity) {
                 kTzLowerLimit) ||
                ((templateZ.getPosition(kLenUnitMM) + distance) >
                 kTzUpperLimit)) {
-        std::cout << "Template z-axis: " << getPositionTZ() << std::endl;
+        RTT::log(RTT::Info)
+            << "Template z-axis: " << getPositionTZ() << RTT::endlog();
         throw std::invalid_argument(
             "Relative move for template along z-axis is out of bound, {-5,5}");
     } else {
@@ -255,11 +273,12 @@ void RttRos2ZaberBase::home() { setHome(); }
 bool RttRos2ZaberBase::lookUpTransform(const std::string& target,
                                        const std::string& source,
                                        tf2::Transform& output,
+                                       const rclcpp::Time time,
                                        double time_out) {
     geometry_msgs::msg::TransformStamped rx_stamped;
     try {
         rx_stamped = tf_buffer_->lookupTransform(
-            target, source, tf2::TimePointZero, tf2::durationFromSec(time_out));
+            target, source, time, tf2::durationFromSec(time_out));
         tf2::fromMsg(rx_stamped.transform, output);
     } catch (const tf2::TransformException& ex) {
         RTT::log(RTT::Error) << "Could not transform" << source << " to "
@@ -309,27 +328,33 @@ void RttRos2ZaberBase::calibration() {
         Eigen::Vector3d::UnitY().cross(new_y).normalized();
     const double angle = std::acos(Eigen::Vector3d::UnitY().dot(new_y));
 
+    rclcpp::sleep_for(std::chrono::seconds(1));
     tf2::Transform rx_base_tip;
-    if (!lookUpTransform("base", "tip", rx_base_tip, 5.0)) return;
+    if (!lookUpTransform("base", "tip", rx_base_tip,
+                         rtt_ros2_node::getNode(this)->now(), 5.0))
+        return;
 
     tf2::Vector3 curr_tip_position = 1000.0 * rx_base_tip.getOrigin();
-    tip_position_ << curr_tip_position[0], curr_tip_position[1],
+    Eigen::Vector3d tip_position;
+    tip_position << curr_tip_position[0], curr_tip_position[1],
         curr_tip_position[2];
 
-    transform_offset_ = Eigen::Translation3d(tip_position_) *
+    transform_offset_ = Eigen::Translation3d(tip_position) *
                         Eigen::AngleAxis<double>(angle, rot_axis);
-
     transform_offset_ = transform_offset_.inverse();
+
     RTT::log(RTT ::Info) << "\nTransform offset:\n"
-                         << transform_offset_.matrix() << RTT::endlog();
-    RTT::log(RTT::Info) << "Finished calibration" << RTT::endlog();
+                         << transform_offset_.matrix()
+                         << "\nFinished calibration" << RTT::endlog();
 }
 
 bool RttRos2ZaberBase::clear_calibration() {
     setHome(true /* waitUntilIdle */);
 
     tf2::Transform rx_base_tip;
-    if (!lookUpTransform("base", "tip", rx_base_tip, 5.0)) return false;
+    if (!lookUpTransform("base", "tip", rx_base_tip,
+                         rtt_ros2_node::getNode(this)->now(), 5.0))
+        return false;
 
     tf2::Vector3 curr_tip_position = 1000.0 * rx_base_tip.getOrigin();
     tip_position_ << curr_tip_position[0], curr_tip_position[1],
