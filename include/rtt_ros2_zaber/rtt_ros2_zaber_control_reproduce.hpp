@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #include <queue>
 #include <vector>
@@ -22,7 +23,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void setJacobian(const std::vector<double>& j);
 
     void autoInsertion(const std::string& file);
-    void reproduce(const std::string& experiment);
+    void reproduce();
+
+    void save_reproduce_results(const std::string& experiment);
 
     enum class State { IDLE, DEMO, CONTROL };
 
@@ -31,9 +34,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     bool safety_check();
 
-    bool update_target();
-    void update_jacobian();
-    void send_control_vels();
+    bool update_target(Eigen::Vector3d curr_tip_position);
+    Eigen::Vector3d update_jacobian();
+    void send_control_vels(Eigen::Vector3d curr_tip_position);
 
     void control_loop();
 
@@ -51,23 +54,29 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     bool ready_to_reproduce_;
     TrajCollector reproduce_traj_;
 
-    bool sg_filtering_;
+    bool demo_filtering_;
     bool demo_points_filtered_;
-    std::unique_ptr<SavitzkyGolayFilter> filter;
+    bool reproduce_filtering_;
+    std::unique_ptr<SavitzkyGolayFilter> filter_;
 
     Eigen::Vector3d current_target_;
 
     Eigen::Vector3d prev_joint_states_;
     Eigen::Vector3d prev_tip_position_;
     Eigen::Matrix3d jacobian_;
-    double jacobian_update_step_;         // mm
-    double jacobian_update_step_square_;  // mm^2
+    Eigen::Matrix3d jacobian_inv_;
+    double jacobian_update_step_;  // s
+    long jacobian_update_step_ns_;  // s
+    bool use_estimate_tip_position_;
 
     double target_ahead_dis_;  // mm
     double max_control_vel_;
     double error_tolerance_;  // mm
 
-    double prev_time_;
+    long prev_cmd_time_;       // ns
+    long prev_jacobian_time_;  // ns
+
+    std::string reproduce_result_folder_;
 };
 
 std::ostream& operator<<(std::ostream& os,

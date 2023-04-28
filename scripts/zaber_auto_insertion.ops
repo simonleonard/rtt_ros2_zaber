@@ -12,6 +12,6 @@ setActivity("zaber_auto_insertion", 0.01, 0, ORO_SCHED_OTHER)
 
 stream("zaber_auto_insertion.demo_point", ros.topic("/demo_point", false))
 
-zaber_auto_insertion.device_file = "/dev/ttyUSB2"
+zaber_auto_insertion.device_file = "/dev/ttyUSB1"
 zaber_auto_insertion.configure() 
 zaber_auto_insertion.start() 

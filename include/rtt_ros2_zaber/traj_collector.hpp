@@ -1,14 +1,18 @@
+#pragma once
+
 #include <memory>
 #include <vector>
 
 #include "Eigen/Dense"
+#include "rtt_ros2_zaber/sg_filter.hpp"
 
 class TrajCollectorIterator;
 
 class TrajCollector {
    public:
     void addPoint(const Eigen::Ref<Eigen::VectorXd>& inputs,
-                  const Eigen::Ref<Eigen::VectorXd>& outputs);
+                  const Eigen::Ref<Eigen::VectorXd>& outputs,
+                  long time /* ns */);
 
     size_t size() const { return tx_.size(); }
 
@@ -20,12 +24,17 @@ class TrajCollector {
     const std::vector<double>& tip_y() const { return y_; }
     const std::vector<double>& tip_z() const { return z_; }
 
-    std::vector<double>& tip_x() { return x_; }
-    std::vector<double>& tip_y() { return y_; }
-    std::vector<double>& tip_z() { return z_; }
+    const std::vector<double>& tip_x_filtered() const { return x_; }
+    const std::vector<double>& tip_y_filtered() const { return y_; }
+    const std::vector<double>& tip_z_filtered() const { return z_; }
+
+    void filter_tip_position_all(const SavitzkyGolayFilter& filter);
+    bool filter_tip_position_xz_last(const SavitzkyGolayFilter& filter);
 
     void clear();
-    std::unique_ptr<TrajCollectorIterator> createrIterator() const;
+    std::unique_ptr<TrajCollectorIterator> createrIterator(bool filtered) const;
+
+    void write_to_file(const std::string& file_path, bool added_filter_data) const;
 
    private:
     // Control inputs: joint states.
@@ -37,12 +46,26 @@ class TrajCollector {
     std::vector<double> x_;
     std::vector<double> y_;
     std::vector<double> z_;
+
+    std::vector<double> x_filtered_;
+    std::vector<double> y_filtered_;
+    std::vector<double> z_filtered_;
+
+    std::vector<double> timestamps_;
 };
 
 class TrajCollectorIterator {
    public:
-    explicit TrajCollectorIterator(const TrajCollector& traj_collector)
-        : traj_collector_(traj_collector), index_(0) {}
+    explicit TrajCollectorIterator(const TrajCollector& traj_collector,
+                                   bool filtered)
+        : traj_collector_(traj_collector),
+          x_(filtered ? traj_collector.tip_x_filtered()
+                      : traj_collector.tip_x()),
+          y_(filtered ? traj_collector.tip_y_filtered()
+                      : traj_collector.tip_y()),
+          z_(filtered ? traj_collector.tip_z_filtered()
+                      : traj_collector.tip_z()),
+          index_(0) {}
     void first() { index_ = 0; }
     void next() { index_++; }
     bool isDone() const { return index_ == traj_collector_.size(); }
@@ -52,7 +75,12 @@ class TrajCollectorIterator {
 
     Eigen::Vector3d last_inputs() const;
     Eigen::Vector3d last_outputs() const;
+
    private:
     const TrajCollector& traj_collector_;
+    const std::vector<double>& x_;
+    const std::vector<double>& y_;
+    const std::vector<double>& z_;
+
     int index_;
 };

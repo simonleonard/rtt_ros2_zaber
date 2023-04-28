@@ -18,10 +18,11 @@ zaber_control_reproduce.max_control_vel = 1.0
 zaber_control_reproduce.jacobian_update_step = 0.3
 zaber_control_reproduce.target_ahead_dis = 0.5
 zaber_control_reproduce.error_tolerance = 0.1
-zaber_control_reproduce.sg_filtering = true
+zaber_control_reproduce.demo_filtering = true
+zaber_control_reproduce.reproduce_filtering = true
+zaber_control_reproduce.reproduce_result_folder = "/home/xma42/reproduce_results"
 
 zaber_control_reproduce.configure() 
 zaber_control_reproduce.start() 
 
-zaber_control_reproduce.SetJacobian(array(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0))
 zaber_control_reproduce.Calibrate(4.0)

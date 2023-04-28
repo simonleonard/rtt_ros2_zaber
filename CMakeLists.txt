@@ -66,7 +66,9 @@ target_link_libraries(rtt_ros2_zaber_auto_insertion
 orocos_component(rtt_ros2_zaber_control_reproduce
   src/rtt_ros2_zaber_control_reproduce.cpp
   src/sg_filter.cpp
-  src/traj_collector.cpp)
+  src/traj_collector.cpp
+)
+
 target_link_libraries(rtt_ros2_zaber_control_reproduce
   rtt_ros2_zaber_base
 )

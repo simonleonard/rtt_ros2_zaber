@@ -1,4 +1,5 @@
 #pragma once
+
 #include <tf2/transform_datatypes.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -10,6 +11,7 @@
 #include <rtt/TaskContext.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <string>
+
 #include "Eigen/Dense"
 #include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 
@@ -76,7 +78,8 @@ class RttRos2ZaberBase : public RTT::TaskContext {
 
     Eigen::Transform<double, 3, Eigen::Isometry> transform_offset_;
 
-    long calibration_end_time_;
+    long curr_time_;             // ns
+    long calibration_end_time_;  // ns
     bool calibrating_;
     std::vector<Eigen::Vector3d> calibration_points_;
 };

@@ -14,32 +14,34 @@ int int_power(int x, unsigned int p) {
 }
 
 SavitzkyGolayFilter::SavitzkyGolayFilter(int l, int r, int o)
-    : left(l), right(r), order(o), window_size(l + r + 1) {
-    Eigen::MatrixXd H(window_size, order + 1);
-    for (int i = 0; i < window_size; ++i) {
-        for (int j = 0; j < order + 1; ++j) {
+    : left_(l), right_(r), order_(o), window_size_(l + r + 1) {
+    Eigen::MatrixXd H(window_size_, order_ + 1);
+    for (int i = 0; i < window_size_; ++i) {
+        for (int j = 0; j < order_ + 1; ++j) {
             H(i, j) = int_power(i - l - 1, j - 1);
         }
     }
-    B = H * (H.transpose() * H).inverse() * H.transpose();
-    weights = B.row(l);
+    B_ = H * (H.transpose() * H).inverse() * H.transpose();
+    weights_ = B_.row(l);
 }
 
-std::vector<double> SavitzkyGolayFilter::filter(const std::vector<double>& in) {
+std::vector<double> SavitzkyGolayFilter::filter(
+    const std::vector<double>& in) const {
     const size_t n = in.size();
     Eigen::VectorXd in_v =
         Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned>(in.data(), n);
     Eigen::VectorXd out_v(n);
 
-    out_v.head(left) = B.topRows(left) * in_v.head(window_size);
-    for (int i = left; i < n - right; ++i) {
-        out_v(i) = weights.dot(in_v.segment(i - left, window_size));
+    out_v.head(left_) = B_.topRows(left_) * in_v.head(window_size_);
+    for (int i = left_; i < n - right_; ++i) {
+        out_v(i) = weights_.dot(in_v.segment(i - left_, window_size_));
     }
-    out_v.tail(right) = B.bottomRows(right) * in_v.tail(window_size);
+    out_v.tail(right_) = B_.bottomRows(right_) * in_v.tail(window_size_);
     return {out_v.data(), out_v.data() + n};
 }
-double SavitzkyGolayFilter::filter_last_one(const std::vector<double>& in) {
+double SavitzkyGolayFilter::filter_last_one(
+    const std::vector<double>& in) const {
     Eigen::VectorXd in_v = Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned>(
-        in.data() + in.size() - window_size, window_size);
-    return weights.dot(in_v);
+        in.data() + in.size() - window_size_, window_size_);
+    return weights_.dot(in_v);
 }

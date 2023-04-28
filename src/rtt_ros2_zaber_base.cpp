@@ -107,9 +107,10 @@ void RttRos2ZaberBase::updateHook() {
 
     joint_states_ << getPositionTX(), getPositionLS(), getPositionTZ();
 
+    auto now = rtt_ros2_node::getNode(this)->now();
     needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
     demo_pt.header.frame_id = "Control";
-    demo_pt.header.stamp = rtt_ros2_node::getNode(this)->now();
+    demo_pt.header.stamp = now;
 
     demo_pt.inputs.tx = joint_states_.x();
     demo_pt.inputs.ls = joint_states_.y();
@@ -118,9 +119,11 @@ void RttRos2ZaberBase::updateHook() {
     demo_pt.outputs.y = tip_position_.y();
     demo_pt.outputs.z = tip_position_.z();
     port_demo_point_.write(demo_pt);
-
+    
+    curr_time_ = now.nanoseconds();
+    
     if (calibrating_) {
-        if (rtt_ros2_node::getNode(this)->now().nanoseconds() >=
+        if (now.nanoseconds() >=
             calibration_end_time_) {
             calibrating_ = false;
             linearStage.stop();

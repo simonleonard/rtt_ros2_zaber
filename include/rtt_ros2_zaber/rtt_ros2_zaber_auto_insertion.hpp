@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
@@ -23,5 +22,4 @@ class RttRos2ZaberAutoInsertion : public RttRos2ZaberBase {
 
     long insertion_start_time_;
     std::queue<Command> insert_cmds_;
-
 };
