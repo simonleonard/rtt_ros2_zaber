@@ -12,6 +12,8 @@
   <depend>rtt_ros2</depend>
   <depend>rtt_ros2_node</depend>
   <depend>needle_steering_control_demo_msgs</depend>
+  <depend>control_reproduce_interfaces</depend>
+  <depend>std_srvs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <test_depend>ament_lint_auto</test_depend>

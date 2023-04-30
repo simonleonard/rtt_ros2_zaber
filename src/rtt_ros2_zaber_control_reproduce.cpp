@@ -31,6 +31,9 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addOperation("SaveReproduceResults",
                  &RttRos2ZaberControlReproduce::save_reproduce_results, this,
                  RTT::OwnThread);
+    addOperation("ClearDemoTrajPlot",
+                 &RttRos2ZaberControlReproduce::clear_demo_traj_plot, this,
+                 RTT::OwnThread);
 
     addProperty("max_control_vel", max_control_vel_);
     addProperty("jacobian_update_step", jacobian_update_step_);
@@ -41,6 +44,12 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addProperty("use_estimate_tip_position", use_estimate_tip_position_);
 
     addProperty("reproduce_result_folder", reproduce_result_folder_);
+
+    addPort("demo_wpt", port_demo_wpt_);
+
+    clear_demo_wpts_client_ =
+        rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
+            "clear_demo_way_points");
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
@@ -97,11 +106,12 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
         insert_cmds_.push(cmd);
     }
 
-    insertion_start_time_ = rtt_ros2_node::getNode(this)->now().nanoseconds();
+    insertion_start_time_ = curr_time_;
     RTT::log(RTT::Info) << "Insertion start time: " << insertion_start_time_
                         << RTT::endlog();
 
     demo_traj_.clear();
+    clear_demo_traj_plot();
 
     state_ = State::DEMO;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
@@ -112,9 +122,17 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
 void RttRos2ZaberControlReproduce::collect_demo_points() {
     demo_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
-    const long curr_time = rtt_ros2_node::getNode(this)->now().nanoseconds();
+    control_reproduce_interfaces::msg::Measurement demo_wpt;
+    demo_wpt.js.tx = joint_states_.x();
+    demo_wpt.js.ls = joint_states_.y();
+    demo_wpt.js.tz = joint_states_.z();
+    demo_wpt.tp.x = tip_position_.x();
+    demo_wpt.tp.y = tip_position_.y();
+    demo_wpt.tp.z = tip_position_.z();
+    port_demo_wpt_.write(demo_wpt);
+
     while (!insert_cmds_.empty() &&
-           curr_time >=
+           curr_time_ >=
                insert_cmds_.front().start_time + insertion_start_time_) {
         const auto cmd = insert_cmds_.front();
         insert_cmds_.pop();
@@ -335,6 +353,11 @@ void RttRos2ZaberControlReproduce::save_reproduce_results(
                              demo_filtering_);
     reproduce_traj_.write_to_file((exp_path / "reproduce_traj.txt").string(),
                                   reproduce_filtering_);
+}
+
+void RttRos2ZaberControlReproduce::clear_demo_traj_plot() const {
+    auto request = std::make_shared<std_srvs::srv::Empty::Request>();
+    clear_demo_wpts_client_->async_send_request(request);
 }
 
 std::ostream& operator<<(std::ostream& os,

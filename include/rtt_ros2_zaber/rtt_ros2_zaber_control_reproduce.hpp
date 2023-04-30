@@ -4,6 +4,9 @@
 #include <queue>
 #include <vector>
 
+#include <std_srvs/srv/empty.hpp>
+
+#include "control_reproduce_interfaces/msg/measurement.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 #include "rtt_ros2_zaber/sg_filter.hpp"
@@ -27,6 +30,7 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     void save_reproduce_results(const std::string& experiment);
 
+    void clear_demo_traj_plot() const;
     enum class State { IDLE, DEMO, CONTROL };
 
    private:
@@ -65,7 +69,7 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     Eigen::Vector3d prev_tip_position_;
     Eigen::Matrix3d jacobian_;
     Eigen::Matrix3d jacobian_inv_;
-    double jacobian_update_step_;  // s
+    double jacobian_update_step_;   // s
     long jacobian_update_step_ns_;  // s
     bool use_estimate_tip_position_;
 
@@ -77,6 +81,11 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     long prev_jacobian_time_;  // ns
 
     std::string reproduce_result_folder_;
+
+    RTT::OutputPort<control_reproduce_interfaces::msg::Measurement>
+        port_demo_wpt_;
+    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr
+        clear_demo_wpts_client_;
 };
 
 std::ostream& operator<<(std::ostream& os,

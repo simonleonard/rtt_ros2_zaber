@@ -5,12 +5,14 @@ import("rtt_ros2_geometry_msgs")
 import("rtt_ros2_sensor_msgs")
 import("rtt_ros2_std_msgs")
 import("rtt_ros2_needle_steering_control_demo_msgs")
+import("rtt_ros2_control_reproduce_interfaces")
 import("rtt_ros2_zaber")
 
 loadComponent("zaber_control_reproduce", "RttRos2ZaberControlReproduce" )
 setActivity("zaber_control_reproduce", 0.005, 0, ORO_SCHED_OTHER)
 
 stream("zaber_control_reproduce.demo_point", ros.topic("/demo_point", false))
+stream("zaber_control_reproduce.demo_wpt", ros.topic("/demo_wpt", false))
 
 zaber_control_reproduce.device_file = "/dev/ttyUSB2"
 
@@ -24,5 +26,3 @@ zaber_control_reproduce.reproduce_result_folder = "/home/xma42/reproduce_results
 
 zaber_control_reproduce.configure() 
 zaber_control_reproduce.start() 
-
-zaber_control_reproduce.Calibrate(4.0)

@@ -17,13 +17,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(rtt_ros2 REQUIRED)
 find_package(rtt_ros2_node REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(needle_steering_control_demo_msgs REQUIRED)
-
-# find_package(rclcpp REQUIRED)
+find_package(control_reproduce_interfaces REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -36,8 +37,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_package()
-
 include_directories(
   include
   eigen-3.4.0
@@ -49,7 +48,6 @@ target_link_libraries(rtt_ros2_zaber_base
   rtt_ros2_node::rtt_ros2_node
   zml
 )
-
 ament_target_dependencies(rtt_ros2_zaber_base
   tf2
   tf2_ros
@@ -68,21 +66,14 @@ orocos_component(rtt_ros2_zaber_control_reproduce
   src/sg_filter.cpp
   src/traj_collector.cpp
 )
-
 target_link_libraries(rtt_ros2_zaber_control_reproduce
   rtt_ros2_zaber_base
 )
-
-# ament_target_dependencies(rtt_ros2_zaber_control_reproduce
-#   tf2
-#   tf2_ros
-#   needle_steering_control_demo_msgs
-# )
-
-# ament_target_dependencies(rtt_ros2_zaber_auto_insertion
-#   tf2
-#   tf2_ros
-#   needle_steering_control_demo_msgs
-# )
+ament_target_dependencies(rtt_ros2_zaber_control_reproduce
+  control_reproduce_interfaces
+  std_srvs
+)
 
 orocos_generate_package()
+
+ament_package()

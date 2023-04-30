@@ -10,9 +10,9 @@ constexpr double kTxUpperLimit = 17.5;
 // constexpr double kTzLowerLimit = 5.0;
 // constexpr double kTzUpperLimit = 15.0;
 
-constexpr double kTzHome = 9.5;
-constexpr double kTzLowerLimit = 4.5;
-constexpr double kTzUpperLimit = 14.5;
+constexpr double kTzHome = 9.0;
+constexpr double kTzLowerLimit = 4.0;
+constexpr double kTzUpperLimit = 14.0;
 
 constexpr double kLsHome = 20.0;
 constexpr double kLsLowerLimit = 20.0;
