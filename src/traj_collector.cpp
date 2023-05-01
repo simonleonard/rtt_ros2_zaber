@@ -3,16 +3,15 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-void TrajCollector::addPoint(const Eigen::Ref<Eigen::VectorXd>& inputs,
-                             const Eigen::Ref<Eigen::VectorXd>& outputs,
-                             long time) {
-    tx_.push_back(inputs.x());
-    ls_.push_back(inputs.y());
-    tz_.push_back(inputs.z());
+void TrajCollector::addPoint(const Eigen::Ref<Eigen::VectorXd>& js,
+                             const Eigen::Ref<Eigen::VectorXd>& tp, long time) {
+    tx_.push_back(js.x());
+    ls_.push_back(js.y());
+    tz_.push_back(js.z());
 
-    x_.push_back(outputs.x());
-    y_.push_back(outputs.y());
-    z_.push_back(outputs.z());
+    x_.push_back(tp.x());
+    y_.push_back(tp.y());
+    z_.push_back(tp.z());
 
     timestamps_.push_back(time * 1.0e-9);
 }

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "control_reproduce_interfaces/msg/measurement.hpp"
+#include "control_reproduce_interfaces/msg/tip_position.hpp"
 #include "control_reproduce_interfaces/srv/add_filtered_demo_wpts.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
@@ -24,6 +25,7 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     void printJacobian() const;
     void setJacobian(const std::vector<double>& j);
+    void setRevInitJacobian();
 
     void autoInsertion(const std::string& file);
     void reproduce();
@@ -77,12 +79,13 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     Eigen::Matrix3d jacobian_;
     Eigen::Matrix3d jacobian_inv_;
     double jacobian_update_step_;   // s
-    long jacobian_update_step_ns_;  // s
     bool use_estimate_tip_position_;
 
     double target_ahead_dis_;  // mm
     double max_control_vel_;
-    double error_tolerance_;  // mm
+    double y_error_tolerance_;  // mm
+    double xz_error_tolerance_;  // mm
+
 
     long prev_cmd_time_;       // ns
     long prev_jacobian_time_;  // ns
@@ -99,6 +102,14 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
         port_reproduce_wpt_;
     rclcpp::Client<std_srvs::srv::Empty>::SharedPtr
         clear_reproduce_wpts_client_;
+
+    RTT::OutputPort<control_reproduce_interfaces::msg::TipPosition>
+        port_reproduce_tp_filtered_;
+    control_reproduce_interfaces::msg::TipPosition curr_repr_tip_filtered_msg_;
+
+    RTT::OutputPort<control_reproduce_interfaces::msg::TipPosition>
+        port_jacobian_update_tp_;
+    control_reproduce_interfaces::msg::TipPosition jacobian_update_tp_msg_;
 };
 
 std::ostream& operator<<(std::ostream& os,

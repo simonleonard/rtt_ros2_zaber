@@ -13,7 +13,7 @@
 #include "rtt_ros2_zaber/rtt_ros2_zaber_constants.hpp"
 
 RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
-    : RTT::TaskContext(name) {
+    : RTT::TaskContext(name), calibrating_(false) {
     global_ros = RTT::internal::GlobalService::Instance()->getService("ros");
     RTT::OperationCaller<bool(const std::string&)> create_node =
         global_ros->getOperation("create_named_node");

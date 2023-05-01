@@ -10,8 +10,8 @@ class TrajCollectorIterator;
 
 class TrajCollector {
    public:
-    void addPoint(const Eigen::Ref<Eigen::VectorXd>& inputs,
-                  const Eigen::Ref<Eigen::VectorXd>& outputs,
+    void addPoint(const Eigen::Ref<Eigen::VectorXd>& js,
+                  const Eigen::Ref<Eigen::VectorXd>& tp,
                   long time /* ns */);
 
     size_t size() const { return tx_.size(); }

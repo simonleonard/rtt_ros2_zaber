@@ -14,20 +14,22 @@ setActivity("zaber_control_reproduce", 0.005, 0, ORO_SCHED_OTHER)
 stream("zaber_control_reproduce.control_measurement", ros.topic("/control_measurement", false))
 stream("zaber_control_reproduce.demo_wpt", ros.topic("/demo_wpt", false))
 stream("zaber_control_reproduce.reproduce_wpt", ros.topic("/reproduce_wpt", false))
-
+stream("zaber_control_reproduce.reproduce_tp_filtered", ros.topic("/reproduce_tp_filtered", false))
+stream("zaber_control_reproduce.jacobian_update_tp", ros.topic("/jacobian_update_tp", false))
 
 zaber_control_reproduce.device_file = "/dev/ttyUSB2"
 
 zaber_control_reproduce.max_control_vel = 1.0
-zaber_control_reproduce.jacobian_update_step = 0.3
+zaber_control_reproduce.jacobian_update_step = 0.5
 zaber_control_reproduce.target_ahead_dis = 0.5
-zaber_control_reproduce.error_tolerance = 0.1
+zaber_control_reproduce.y_error_tolerance = 0.1
+zaber_control_reproduce.xz_error_tolerance = 0.5
 
 zaber_control_reproduce.demo_filtering = true
 zaber_control_reproduce.demo_filter_window = 21
 zaber_control_reproduce.demo_filter_order = 2
 
-zaber_control_reproduce.reproduce_filtering = true
+zaber_control_reproduce.reproduce_filtering = false
 zaber_control_reproduce.reproduce_filter_window = 15
 zaber_control_reproduce.reproduce_filter_order = 2
 

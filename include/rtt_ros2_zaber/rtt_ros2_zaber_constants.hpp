@@ -2,9 +2,13 @@
 
 #include <zaber/motion/units.h>
 
-constexpr double kTxHome = 12.5;
-constexpr double kTxLowerLimit = 7.5;
-constexpr double kTxUpperLimit = 17.5;
+// constexpr double kTxHome = 12.5;
+// constexpr double kTxLowerLimit = 7.5;
+// constexpr double kTxUpperLimit = 17.5;
+
+constexpr double kTxHome = 11.5;
+constexpr double kTxLowerLimit = 6.5;
+constexpr double kTxUpperLimit = 16.5;
 
 // constexpr double kTzHome = 10.0;
 // constexpr double kTzLowerLimit = 5.0;

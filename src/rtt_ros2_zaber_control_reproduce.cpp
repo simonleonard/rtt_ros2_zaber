@@ -21,6 +21,9 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
                  RTT::OwnThread);
     addOperation("SetJacobian", &RttRos2ZaberControlReproduce::setJacobian,
                  this, RTT::OwnThread);
+    addOperation("SetRevInitJacobian",
+                 &RttRos2ZaberControlReproduce::setRevInitJacobian, this,
+                 RTT::OwnThread);
 
     addOperation("AutoInsertion", &RttRos2ZaberControlReproduce::autoInsertion,
                  this, RTT::OwnThread);
@@ -40,7 +43,8 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addProperty("max_control_vel", max_control_vel_);
     addProperty("jacobian_update_step", jacobian_update_step_);
     addProperty("target_ahead_dis", target_ahead_dis_);
-    addProperty("error_tolerance", error_tolerance_);
+    addProperty("y_error_tolerance", y_error_tolerance_);
+    addProperty("xz_error_tolerance", xz_error_tolerance_);
 
     addProperty("demo_filtering", demo_filtering_);
     addProperty("demo_filter_window", demo_filter_window_);
@@ -56,6 +60,8 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
 
     addPort("demo_wpt", port_demo_wpt_);
     addPort("reproduce_wpt", port_reproduce_wpt_);
+    addPort("reproduce_tp_filtered", port_reproduce_tp_filtered_);
+    addPort("jacobian_update_tp", port_jacobian_update_tp_);
 
     clear_demo_wpts_client_ =
         rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
@@ -78,7 +84,6 @@ bool RttRos2ZaberControlReproduce::configureHook() {
 bool RttRos2ZaberControlReproduce::startHook() {
     jacobian_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
     jacobian_inv_ << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
-    jacobian_update_step_ns_ = jacobian_update_step_ * 1e9;
     return RttRos2ZaberBase::startHook();
 }
 
@@ -107,6 +112,11 @@ void RttRos2ZaberControlReproduce::printJacobian() const {
 
 void RttRos2ZaberControlReproduce::setJacobian(const std::vector<double>& j) {
     jacobian_ << j[0], j[1], j[2], j[3], j[4], j[5], j[6], j[7], j[8];
+    jacobian_inv_ = jacobian_.inverse();
+}
+
+void RttRos2ZaberControlReproduce::setRevInitJacobian() {
+    jacobian_ << -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0;
     jacobian_inv_ = jacobian_.inverse();
 }
 
@@ -216,6 +226,11 @@ void RttRos2ZaberControlReproduce::reproduce() {
     prev_cmd_time_ = curr_time_;
     prev_jacobian_time_ = curr_time_;
 
+    jacobian_update_tp_msg_.x = tip_position_.x();
+    jacobian_update_tp_msg_.y = tip_position_.y();
+    jacobian_update_tp_msg_.z = tip_position_.z();
+    port_jacobian_update_tp_.write(jacobian_update_tp_msg_);
+
     printJacobian();
 
     if (reproduce_filtering_) {
@@ -254,10 +269,11 @@ bool RttRos2ZaberControlReproduce::safety_check() {
 
 bool RttRos2ZaberControlReproduce::update_target(
     Eigen::Vector3d curr_tip_position) {
+    Eigen::Vector3d e_abs = (current_target_ - curr_tip_position).cwiseAbs();
     // Update target.
-    while ((current_target_.y() < curr_tip_position.y() ||
-            (current_target_ - curr_tip_position).cwiseAbs().maxCoeff() <
-                error_tolerance_)) {
+    while (current_target_.y() < curr_tip_position.y() ||
+           (e_abs.y() < y_error_tolerance_ && e_abs.x() < xz_error_tolerance_ &&
+            e_abs.z() < xz_error_tolerance_)) {
         // Stop if no target left.
         if (demo_traj_itr_->isDone()) {
             linearStage.stop();
@@ -291,6 +307,8 @@ bool RttRos2ZaberControlReproduce::update_target(
         current_target_ = demo_traj_itr_->isDone()
                               ? demo_traj_itr_->last_tp()
                               : demo_traj_itr_->current_tp();
+
+        e_abs = (current_target_ - curr_tip_position).cwiseAbs();
     }
     return true;
 }
@@ -298,7 +316,7 @@ bool RttRos2ZaberControlReproduce::update_target(
 Eigen::Vector3d RttRos2ZaberControlReproduce::update_jacobian() {
     Eigen::Vector3d dx = joint_states_ - prev_joint_states_;
     Eigen::Vector3d dy = tip_position_ - prev_tip_position_;
-    if (curr_time_ - prev_jacobian_time_ > jacobian_update_step_ns_ &&
+    if ((curr_time_ - prev_jacobian_time_) * 1.0e-9 > jacobian_update_step_ &&
         dx.norm() > 0.1) {
         jacobian_ = jacobian_ + (dy - jacobian_ * dx) * dx.transpose() /
                                     (dx.transpose() * dx);
@@ -308,6 +326,11 @@ Eigen::Vector3d RttRos2ZaberControlReproduce::update_jacobian() {
                                 (dx.transpose() * jacobian_inv_ * dy) *
                                 dx.transpose() * jacobian_inv_;
         printJacobian();
+
+        jacobian_update_tp_msg_.x = tip_position_.x();
+        jacobian_update_tp_msg_.y = tip_position_.y();
+        jacobian_update_tp_msg_.z = tip_position_.z();
+        port_jacobian_update_tp_.write(jacobian_update_tp_msg_);
 
         // Update previous way point.
         prev_joint_states_ = joint_states_;
@@ -324,7 +347,10 @@ void RttRos2ZaberControlReproduce::send_control_vels(
     Eigen::Vector3d curr_tip_position) {
     // Calculate control input.
     Eigen::Vector3d error = current_target_ - curr_tip_position;
-    error = (error.cwiseAbs().array() < error_tolerance_).select(0.0, error);
+    error = (error.cwiseAbs().array() < Eigen::Array3d(xz_error_tolerance_,
+                                                       y_error_tolerance_,
+                                                       xz_error_tolerance_))
+                .select(0.0, error);
     Eigen::Vector3d control_input = jacobian_inv_ * error;
     control_input *= max_control_vel_ / control_input.norm();
 
@@ -349,14 +375,21 @@ void RttRos2ZaberControlReproduce::control_loop() {
     reproduce_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
     if (reproduce_filtering_) {
-        if (!reproduce_traj_.filter_tip_position_xz_last(*filter_)) {
-            RTT::log(RTT::Info)
-                << "Accumulating measurements..." << RTT::endlog();
-            prev_joint_states_ = joint_states_;
-            prev_tip_position_ = tip_position_;
-            prev_jacobian_time_ = curr_time_;
-            return;
-        }
+        // if (!reproduce_traj_.filter_tip_position_xz_last(*filter_)) {
+        //     RTT::log(RTT::Info)
+        //         << "Accumulating measurements..." << RTT::endlog();
+        //     prev_joint_states_ = joint_states_;
+        //     prev_tip_position_ = tip_position_;
+        //     prev_jacobian_time_ = curr_time_;
+        //     return;
+        // }
+        reproduce_traj_.filter_tip_position_xz_last(*filter_);
+
+        curr_repr_tip_filtered_msg_.x = reproduce_traj_.tip_x_filtered().back();
+        curr_repr_tip_filtered_msg_.y = reproduce_traj_.tip_y_filtered().back();
+        curr_repr_tip_filtered_msg_.z = reproduce_traj_.tip_z_filtered().back();
+        port_reproduce_tp_filtered_.write(curr_repr_tip_filtered_msg_);
+
         tip_position_.x() = reproduce_traj_.tip_x_filtered().back();
         tip_position_.z() = reproduce_traj_.tip_z_filtered().back();
     }
