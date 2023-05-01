@@ -15,7 +15,6 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
       state_(State::IDLE),
       ready_to_reproduce_(false),
       demo_filtering_(false),
-      demo_points_filtered_(false),
       reproduce_filtering_(false),
       use_estimate_tip_position_(false) {
     addOperation("Jacobian", &RttRos2ZaberControlReproduce::printJacobian, this,
@@ -50,6 +49,11 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     clear_demo_wpts_client_ =
         rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
             "clear_demo_way_points");
+    add_filtered_demo_wpts_client_ =
+        rtt_ros2_node::getNode(this)
+            ->create_client<
+                control_reproduce_interfaces::srv::AddFilteredDemoWpts>(
+                "add_filtered_demo_way_points");
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
@@ -115,8 +119,6 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
 
     state_ = State::DEMO;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
-
-    demo_points_filtered_ = false;
 }
 
 void RttRos2ZaberControlReproduce::collect_demo_points() {
@@ -151,16 +153,37 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
                                    cmd.velocity, kVelUnitMMPS, kDefaultAccel,
                                    kAccelUnitMMPS2);
         } else if (cmd.joint == "END") {
+            demo_traj_itr_ = demo_traj_.createrIterator(demo_filtering_);
+
+            if (demo_filtering_) {
+                filter_.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2,
+                                                      (kSGFilterWindow - 1) / 2,
+                                                      kSGFilterOrder));
+                demo_traj_.filter_tip_position_all(*filter_);
+                auto request =
+                    std::make_shared<control_reproduce_interfaces::srv::
+                                         AddFilteredDemoWpts::Request>();
+                request->tps.reserve(demo_traj_.size());
+                while (!demo_traj_itr_->isDone()) {
+                    Eigen::Vector3d tp = demo_traj_itr_->current_tp();
+                    request->tps.emplace_back();
+                    request->tps.back().x = tp.x();
+                    request->tps.back().y = tp.y();
+                    request->tps.back().z = tp.z();
+                    demo_traj_itr_->next();
+                }
+                add_filtered_demo_wpts_client_->async_send_request(request);
+                demo_traj_itr_->first();
+            }
+            
             state_ = State::IDLE;
             RTT::log(RTT::Info)
-                << "Switch to state: " << state_ << RTT::endlog();
-
-            RTT::log(RTT::Info)
-                << "Number of demo way points: " << demo_traj_.size()
+                << "Switch to state: " << state_
+                << "\nNumber of demo way points: " << demo_traj_.size()
                 << RTT::endlog();
 
             ready_to_reproduce_ = true;
-            demo_traj_itr_ = demo_traj_.createrIterator(demo_filtering_);
+            
         }
     }
 }
@@ -186,17 +209,12 @@ void RttRos2ZaberControlReproduce::reproduce() {
 
     printJacobian();
 
-    if (demo_filtering_ && !demo_points_filtered_) {
-        demo_points_filtered_ = true;
-        filter_.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2,
-                                              (kSGFilterWindow - 1) / 2,
-                                              kSGFilterOrder));
-        demo_traj_.filter_tip_position_all(*filter_);
+    if (demo_filtering_) {
         filter_.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2, 0,
                                               kSGFilterOrder));
     }
 
-    current_target_ = demo_traj_itr_->current_outputs();
+    current_target_ = demo_traj_itr_->current_tp();
 
     state_ = State::CONTROL;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
@@ -256,14 +274,14 @@ bool RttRos2ZaberControlReproduce::update_target(
         }
 
         while (!demo_traj_itr_->isDone() &&
-               (demo_traj_itr_->current_outputs() - current_target_).norm() <
+               (demo_traj_itr_->current_tp() - current_target_).norm() <
                    target_ahead_dis_) {
             demo_traj_itr_->next();
         }
 
         current_target_ = demo_traj_itr_->isDone()
-                              ? demo_traj_itr_->last_outputs()
-                              : demo_traj_itr_->current_outputs();
+                              ? demo_traj_itr_->last_tp()
+                              : demo_traj_itr_->current_tp();
     }
     return true;
 }

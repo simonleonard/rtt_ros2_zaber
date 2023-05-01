@@ -77,18 +77,18 @@ void TrajCollector::write_to_file(const std::string& file_path,
     file.close();
 }
 
-Eigen::Vector3d TrajCollectorIterator::current_inputs() const {
+Eigen::Vector3d TrajCollectorIterator::current_js() const {
     return {traj_collector_.tx()[index_], traj_collector_.ls()[index_],
             traj_collector_.tz()[index_]};
 }
-Eigen::Vector3d TrajCollectorIterator::current_outputs() const {
+Eigen::Vector3d TrajCollectorIterator::current_tp() const {
     return {x_[index_], y_[index_], z_[index_]};
 }
 
-Eigen::Vector3d TrajCollectorIterator::last_inputs() const {
+Eigen::Vector3d TrajCollectorIterator::last_js() const {
     return {traj_collector_.tx().back(), traj_collector_.ls().back(),
             traj_collector_.tz().back()};
 }
-Eigen::Vector3d TrajCollectorIterator::last_outputs() const {
+Eigen::Vector3d TrajCollectorIterator::last_tp() const {
     return {x_.back(), y_.back(), z_.back()};
 }

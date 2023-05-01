@@ -13,7 +13,7 @@
 #include <string>
 
 #include "Eigen/Dense"
-#include "needle_steering_control_demo_msgs/msg/control_demo_point.hpp"
+#include "control_reproduce_interfaces/msg/measurement.hpp"
 
 class RttRos2ZaberBase : public RTT::TaskContext {
    public:
@@ -67,8 +67,7 @@ class RttRos2ZaberBase : public RTT::TaskContext {
 
     zaber::motion::ascii::Connection connection;
 
-    RTT::OutputPort<needle_steering_control_demo_msgs::msg::ControlDemoPoint>
-        port_demo_point_;
+    RTT::OutputPort<control_reproduce_interfaces::msg::Measurement> port_meas_;
 
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;

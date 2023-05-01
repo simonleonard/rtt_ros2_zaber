@@ -20,7 +20,7 @@ RttRos2ZaberBase::RttRos2ZaberBase(const std::string& name)
     create_node.ready();
     create_node(name);
 
-    addPort("demo_point", port_demo_point_);
+    addPort("control_measurement", port_meas_);
 
     addOperation("GetPositionLS", &RttRos2ZaberBase::getPositionLS, this,
                  RTT::OwnThread);
@@ -108,23 +108,22 @@ void RttRos2ZaberBase::updateHook() {
     joint_states_ << getPositionTX(), getPositionLS(), getPositionTZ();
 
     auto now = rtt_ros2_node::getNode(this)->now();
-    needle_steering_control_demo_msgs::msg::ControlDemoPoint demo_pt;
-    demo_pt.header.frame_id = "Control";
-    demo_pt.header.stamp = now;
 
-    demo_pt.inputs.tx = joint_states_.x();
-    demo_pt.inputs.ls = joint_states_.y();
-    demo_pt.inputs.tz = joint_states_.z();
-    demo_pt.outputs.x = tip_position_.x();
-    demo_pt.outputs.y = tip_position_.y();
-    demo_pt.outputs.z = tip_position_.z();
-    port_demo_point_.write(demo_pt);
-    
+    control_reproduce_interfaces::msg::Measurement meas;
+    meas.header.frame_id = "Control";
+    meas.header.stamp = now;
+    meas.js.tx = joint_states_.x();
+    meas.js.ls = joint_states_.y();
+    meas.js.tz = joint_states_.z();
+    meas.tp.x = tip_position_.x();
+    meas.tp.y = tip_position_.y();
+    meas.tp.z = tip_position_.z();
+    port_meas_.write(meas);
+
     curr_time_ = now.nanoseconds();
-    
+
     if (calibrating_) {
-        if (now.nanoseconds() >=
-            calibration_end_time_) {
+        if (now.nanoseconds() >= calibration_end_time_) {
             calibrating_ = false;
             linearStage.stop();
             calibration();

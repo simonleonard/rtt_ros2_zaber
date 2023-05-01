@@ -2,11 +2,11 @@
 
 #include <iostream>
 #include <queue>
+#include <std_srvs/srv/empty.hpp>
 #include <vector>
 
-#include <std_srvs/srv/empty.hpp>
-
 #include "control_reproduce_interfaces/msg/measurement.hpp"
+#include "control_reproduce_interfaces/srv/add_filtered_demo_wpts.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 #include "rtt_ros2_zaber/sg_filter.hpp"
@@ -59,7 +59,6 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     TrajCollector reproduce_traj_;
 
     bool demo_filtering_;
-    bool demo_points_filtered_;
     bool reproduce_filtering_;
     std::unique_ptr<SavitzkyGolayFilter> filter_;
 
@@ -84,8 +83,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     RTT::OutputPort<control_reproduce_interfaces::msg::Measurement>
         port_demo_wpt_;
-    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr
-        clear_demo_wpts_client_;
+    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr clear_demo_wpts_client_;
+    rclcpp::Client<control_reproduce_interfaces::srv::AddFilteredDemoWpts>::
+        SharedPtr add_filtered_demo_wpts_client_;
 };
 
 std::ostream& operator<<(std::ostream& os,

@@ -70,11 +70,13 @@ class TrajCollectorIterator {
     void next() { index_++; }
     bool isDone() const { return index_ == traj_collector_.size(); }
 
-    Eigen::Vector3d current_inputs() const;
-    Eigen::Vector3d current_outputs() const;
+    // Current joint states
+    Eigen::Vector3d current_js() const;
+    // Current tip position
+    Eigen::Vector3d current_tp() const;
 
-    Eigen::Vector3d last_inputs() const;
-    Eigen::Vector3d last_outputs() const;
+    Eigen::Vector3d last_js() const;
+    Eigen::Vector3d last_tp() const;
 
    private:
     const TrajCollector& traj_collector_;

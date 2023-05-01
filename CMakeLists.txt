@@ -23,7 +23,6 @@ find_package(rtt_ros2_node REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(needle_steering_control_demo_msgs REQUIRED)
 find_package(control_reproduce_interfaces REQUIRED)
 
 if(BUILD_TESTING)
@@ -51,7 +50,7 @@ target_link_libraries(rtt_ros2_zaber_base
 ament_target_dependencies(rtt_ros2_zaber_base
   tf2
   tf2_ros
-  needle_steering_control_demo_msgs
+  control_reproduce_interfaces
 )
 
 orocos_component(rtt_ros2_zaber_auto_insertion 
@@ -70,7 +69,6 @@ target_link_libraries(rtt_ros2_zaber_control_reproduce
   rtt_ros2_zaber_base
 )
 ament_target_dependencies(rtt_ros2_zaber_control_reproduce
-  control_reproduce_interfaces
   std_srvs
 )
 

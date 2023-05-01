@@ -10,7 +10,7 @@ import("rtt_ros2_zaber")
 loadComponent("zaber_base", "RttRos2ZaberBase" )
 setActivity("zaber_base", 0.01, 0, ORO_SCHED_OTHER)
 
-stream("zaber_base.demo_point", ros.topic("/demo_point", false))
+stream("zaber_base.control_measurement", ros.topic("/control_measurement", false))
 
 zaber_base.device_file = "/dev/ttyUSB1"
 zaber_base.configure() 
