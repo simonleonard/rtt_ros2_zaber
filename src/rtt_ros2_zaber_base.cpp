@@ -109,16 +109,15 @@ void RttRos2ZaberBase::updateHook() {
 
     auto now = rtt_ros2_node::getNode(this)->now();
 
-    control_reproduce_interfaces::msg::Measurement meas;
-    meas.header.frame_id = "Control";
-    meas.header.stamp = now;
-    meas.js.tx = joint_states_.x();
-    meas.js.ls = joint_states_.y();
-    meas.js.tz = joint_states_.z();
-    meas.tp.x = tip_position_.x();
-    meas.tp.y = tip_position_.y();
-    meas.tp.z = tip_position_.z();
-    port_meas_.write(meas);
+    curr_meas_msg_.header.frame_id = "Control";
+    curr_meas_msg_.header.stamp = now;
+    curr_meas_msg_.js.tx = joint_states_.x();
+    curr_meas_msg_.js.ls = joint_states_.y();
+    curr_meas_msg_.js.tz = joint_states_.z();
+    curr_meas_msg_.tp.x = tip_position_.x();
+    curr_meas_msg_.tp.y = tip_position_.y();
+    curr_meas_msg_.tp.z = tip_position_.z();
+    port_meas_.write(curr_meas_msg_);
 
     curr_time_ = now.nanoseconds();
 

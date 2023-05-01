@@ -24,9 +24,9 @@ class TrajCollector {
     const std::vector<double>& tip_y() const { return y_; }
     const std::vector<double>& tip_z() const { return z_; }
 
-    const std::vector<double>& tip_x_filtered() const { return x_; }
-    const std::vector<double>& tip_y_filtered() const { return y_; }
-    const std::vector<double>& tip_z_filtered() const { return z_; }
+    const std::vector<double>& tip_x_filtered() const { return x_filtered_; }
+    const std::vector<double>& tip_y_filtered() const { return y_filtered_; }
+    const std::vector<double>& tip_z_filtered() const { return z_filtered_; }
 
     void filter_tip_position_all(const SavitzkyGolayFilter& filter);
     bool filter_tip_position_xz_last(const SavitzkyGolayFilter& filter);
@@ -34,7 +34,8 @@ class TrajCollector {
     void clear();
     std::unique_ptr<TrajCollectorIterator> createrIterator(bool filtered) const;
 
-    void write_to_file(const std::string& file_path, bool added_filter_data) const;
+    void write_to_file(const std::string& file_path,
+                       bool added_filter_data) const;
 
    private:
     // Control inputs: joint states.

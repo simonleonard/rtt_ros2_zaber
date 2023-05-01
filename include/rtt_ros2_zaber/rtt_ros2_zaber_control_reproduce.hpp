@@ -31,6 +31,8 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     void save_reproduce_results(const std::string& experiment);
 
     void clear_demo_traj_plot() const;
+    void clear_reproduce_traj_plot() const;
+
     enum class State { IDLE, DEMO, CONTROL };
 
    private:
@@ -59,7 +61,13 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     TrajCollector reproduce_traj_;
 
     bool demo_filtering_;
+    int demo_filter_window_;
+    int demo_filter_order_;
+
     bool reproduce_filtering_;
+    int reproduce_filter_window_;
+    int reproduce_filter_order_;
+
     std::unique_ptr<SavitzkyGolayFilter> filter_;
 
     Eigen::Vector3d current_target_;
@@ -86,6 +94,11 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     rclcpp::Client<std_srvs::srv::Empty>::SharedPtr clear_demo_wpts_client_;
     rclcpp::Client<control_reproduce_interfaces::srv::AddFilteredDemoWpts>::
         SharedPtr add_filtered_demo_wpts_client_;
+
+    RTT::OutputPort<control_reproduce_interfaces::msg::Measurement>
+        port_reproduce_wpt_;
+    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr
+        clear_reproduce_wpts_client_;
 };
 
 std::ostream& operator<<(std::ostream& os,

@@ -33,18 +33,29 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addOperation("ClearDemoTrajPlot",
                  &RttRos2ZaberControlReproduce::clear_demo_traj_plot, this,
                  RTT::OwnThread);
+    addOperation("ClearReproduceTrajPlot",
+                 &RttRos2ZaberControlReproduce::clear_reproduce_traj_plot, this,
+                 RTT::OwnThread);
 
     addProperty("max_control_vel", max_control_vel_);
     addProperty("jacobian_update_step", jacobian_update_step_);
     addProperty("target_ahead_dis", target_ahead_dis_);
     addProperty("error_tolerance", error_tolerance_);
+
     addProperty("demo_filtering", demo_filtering_);
+    addProperty("demo_filter_window", demo_filter_window_);
+    addProperty("demo_filter_order", demo_filter_order_);
+
     addProperty("reproduce_filtering", reproduce_filtering_);
+    addProperty("reproduce_filter_window", reproduce_filter_window_);
+    addProperty("reproduce_filter_order", reproduce_filter_order_);
+
     addProperty("use_estimate_tip_position", use_estimate_tip_position_);
 
     addProperty("reproduce_result_folder", reproduce_result_folder_);
 
     addPort("demo_wpt", port_demo_wpt_);
+    addPort("reproduce_wpt", port_reproduce_wpt_);
 
     clear_demo_wpts_client_ =
         rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
@@ -54,6 +65,10 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
             ->create_client<
                 control_reproduce_interfaces::srv::AddFilteredDemoWpts>(
                 "add_filtered_demo_way_points");
+
+    clear_reproduce_wpts_client_ =
+        rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
+            "clear_reproduce_way_points");
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
@@ -116,6 +131,7 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
 
     demo_traj_.clear();
     clear_demo_traj_plot();
+    clear_reproduce_traj_plot();
 
     state_ = State::DEMO;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
@@ -124,14 +140,7 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
 void RttRos2ZaberControlReproduce::collect_demo_points() {
     demo_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
-    control_reproduce_interfaces::msg::Measurement demo_wpt;
-    demo_wpt.js.tx = joint_states_.x();
-    demo_wpt.js.ls = joint_states_.y();
-    demo_wpt.js.tz = joint_states_.z();
-    demo_wpt.tp.x = tip_position_.x();
-    demo_wpt.tp.y = tip_position_.y();
-    demo_wpt.tp.z = tip_position_.z();
-    port_demo_wpt_.write(demo_wpt);
+    port_demo_wpt_.write(curr_meas_msg_);
 
     while (!insert_cmds_.empty() &&
            curr_time_ >=
@@ -153,29 +162,27 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
                                    cmd.velocity, kVelUnitMMPS, kDefaultAccel,
                                    kAccelUnitMMPS2);
         } else if (cmd.joint == "END") {
-            demo_traj_itr_ = demo_traj_.createrIterator(demo_filtering_);
-
             if (demo_filtering_) {
-                filter_.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2,
-                                                      (kSGFilterWindow - 1) / 2,
-                                                      kSGFilterOrder));
+                filter_.reset(new SavitzkyGolayFilter(
+                    (demo_filter_window_ - 1) / 2,
+                    (demo_filter_window_ - 1) / 2, demo_filter_order_));
                 demo_traj_.filter_tip_position_all(*filter_);
+                auto itr = demo_traj_.createrIterator(demo_filtering_);
                 auto request =
                     std::make_shared<control_reproduce_interfaces::srv::
                                          AddFilteredDemoWpts::Request>();
                 request->tps.reserve(demo_traj_.size());
-                while (!demo_traj_itr_->isDone()) {
-                    Eigen::Vector3d tp = demo_traj_itr_->current_tp();
+                while (!itr->isDone()) {
+                    Eigen::Vector3d tp = itr->current_tp();
                     request->tps.emplace_back();
                     request->tps.back().x = tp.x();
                     request->tps.back().y = tp.y();
                     request->tps.back().z = tp.z();
-                    demo_traj_itr_->next();
+                    itr->next();
                 }
                 add_filtered_demo_wpts_client_->async_send_request(request);
-                demo_traj_itr_->first();
             }
-            
+
             state_ = State::IDLE;
             RTT::log(RTT::Info)
                 << "Switch to state: " << state_
@@ -183,7 +190,7 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
                 << RTT::endlog();
 
             ready_to_reproduce_ = true;
-            
+            demo_traj_itr_ = demo_traj_.createrIterator(demo_filtering_);
         }
     }
 }
@@ -202,6 +209,8 @@ void RttRos2ZaberControlReproduce::reproduce() {
     reproduce_traj_.clear();
     demo_traj_itr_->first();
 
+    clear_reproduce_traj_plot();
+
     prev_tip_position_ = tip_position_;
     prev_joint_states_ = joint_states_;
     prev_cmd_time_ = curr_time_;
@@ -209,9 +218,9 @@ void RttRos2ZaberControlReproduce::reproduce() {
 
     printJacobian();
 
-    if (demo_filtering_) {
-        filter_.reset(new SavitzkyGolayFilter((kSGFilterWindow - 1) / 2, 0,
-                                              kSGFilterOrder));
+    if (reproduce_filtering_) {
+        filter_.reset(new SavitzkyGolayFilter(reproduce_filter_window_, 0,
+                                              reproduce_filter_order_));
     }
 
     current_target_ = demo_traj_itr_->current_tp();
@@ -343,11 +352,16 @@ void RttRos2ZaberControlReproduce::control_loop() {
         if (!reproduce_traj_.filter_tip_position_xz_last(*filter_)) {
             RTT::log(RTT::Info)
                 << "Accumulating measurements..." << RTT::endlog();
+            prev_joint_states_ = joint_states_;
+            prev_tip_position_ = tip_position_;
+            prev_jacobian_time_ = curr_time_;
             return;
         }
         tip_position_.x() = reproduce_traj_.tip_x_filtered().back();
         tip_position_.z() = reproduce_traj_.tip_z_filtered().back();
     }
+
+    port_reproduce_wpt_.write(curr_meas_msg_);
 
     if (!safety_check()) return;
 
@@ -376,6 +390,11 @@ void RttRos2ZaberControlReproduce::save_reproduce_results(
 void RttRos2ZaberControlReproduce::clear_demo_traj_plot() const {
     auto request = std::make_shared<std_srvs::srv::Empty::Request>();
     clear_demo_wpts_client_->async_send_request(request);
+}
+
+void RttRos2ZaberControlReproduce::clear_reproduce_traj_plot() const {
+    auto request = std::make_shared<std_srvs::srv::Empty::Request>();
+    clear_reproduce_wpts_client_->async_send_request(request);
 }
 
 std::ostream& operator<<(std::ostream& os,

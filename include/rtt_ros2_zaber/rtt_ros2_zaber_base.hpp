@@ -81,4 +81,7 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     long calibration_end_time_;  // ns
     bool calibrating_;
     std::vector<Eigen::Vector3d> calibration_points_;
+
+    control_reproduce_interfaces::msg::Measurement curr_meas_msg_;
+
 };

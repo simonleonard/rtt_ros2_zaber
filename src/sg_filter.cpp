@@ -37,6 +37,7 @@ std::vector<double> SavitzkyGolayFilter::filter(
         out_v(i) = weights_.dot(in_v.segment(i - left_, window_size_));
     }
     out_v.tail(right_) = B_.bottomRows(right_) * in_v.tail(window_size_);
+
     return {out_v.data(), out_v.data() + n};
 }
 double SavitzkyGolayFilter::filter_last_one(

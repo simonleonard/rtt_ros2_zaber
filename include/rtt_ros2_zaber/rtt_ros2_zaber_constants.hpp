@@ -29,6 +29,3 @@ constexpr zaber::motion::Units kVelUnitMMPS =
     zaber::motion::Units::VELOCITY_MILLIMETRES_PER_SECOND;
 constexpr zaber::motion::Units kAccelUnitMMPS2 =
     zaber::motion::Units::ACCELERATION_MILLIMETRES_PER_SECOND_SQUARED;
-
-constexpr int kSGFilterWindow = 31;
-constexpr int kSGFilterOrder = 2;
