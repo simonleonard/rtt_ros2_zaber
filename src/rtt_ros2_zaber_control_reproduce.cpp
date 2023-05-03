@@ -1,6 +1,7 @@
 #include "rtt_ros2_zaber/rtt_ros2_zaber_control_reproduce.hpp"
 
 #include <boost/filesystem.hpp>
+#include <chrono>
 #include <fstream>
 #include <limits>
 #include <rtt/Component.hpp>
@@ -8,7 +9,7 @@
 #include <rtt_ros2_node/rtt_ros2_node.hpp>
 
 #include "rtt_ros2_zaber/rtt_ros2_zaber_constants.hpp"
-
+using namespace std::chrono_literals;
 RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     const std::string& name)
     : RttRos2ZaberBase(name),
@@ -38,6 +39,9 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
                  RTT::OwnThread);
     addOperation("ClearReproduceTrajPlot",
                  &RttRos2ZaberControlReproduce::clearReproduceTrajPlot, this,
+                 RTT::OwnThread);
+
+    addOperation("TogglePlot", &RttRos2ZaberControlReproduce::togglePlot, this,
                  RTT::OwnThread);
 
     addProperty("max_control_vel", max_control_vel_);
@@ -75,6 +79,11 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     clear_reproduce_wpts_client_ =
         rtt_ros2_node::getNode(this)->create_client<std_srvs::srv::Empty>(
             "clear_reproduce_way_points");
+
+    toggle_plot_client_ =
+        rtt_ros2_node::getNode(this)
+            ->create_client<control_reproduce_interfaces::srv::TogglePlot>(
+                "toggle_plot");
 }
 
 bool RttRos2ZaberControlReproduce::configureHook() {
@@ -161,7 +170,7 @@ void RttRos2ZaberControlReproduce::collectDemoPoints() {
         RTT::log(RTT::Info) << cmd.joint << RTT::endlog();
         if (cmd.joint == "LS" || cmd.joint == "TX" || cmd.joint == "TZ") {
             axes_.at(cmd.joint).moveAbs(cmd.target, cmd.velocity,
-                                           kDefaultAccel);
+                                        kDefaultAccel);
         } else if (cmd.joint == "END") {
             if (demo_filtering_) {
                 filter_.reset(new SavitzkyGolayFilter(
@@ -409,13 +418,51 @@ void RttRos2ZaberControlReproduce::save_reproduce_results(
 }
 
 void RttRos2ZaberControlReproduce::clearDemoTrajPlot() const {
+    if (!clear_demo_wpts_client_->service_is_ready()) {
+        RTT::log(RTT::Info) << "Service not ready" << RTT::endlog();
+        return;
+    }
     auto request = std::make_shared<std_srvs::srv::Empty::Request>();
     clear_demo_wpts_client_->async_send_request(request);
 }
 
 void RttRos2ZaberControlReproduce::clearReproduceTrajPlot() const {
+    if (!clear_reproduce_wpts_client_->service_is_ready()) {
+        RTT::log(RTT::Info) << "Service not ready" << RTT::endlog();
+        return;
+    }
     auto request = std::make_shared<std_srvs::srv::Empty::Request>();
     clear_reproduce_wpts_client_->async_send_request(request);
+}
+
+void RttRos2ZaberControlReproduce::togglePlot(const std::string& name) {
+    if (!toggle_plot_client_->service_is_ready()) {
+        RTT::log(RTT::Info) << "Service not ready" << RTT::endlog();
+        return;
+    }
+    auto request = std::make_shared<
+        control_reproduce_interfaces::srv::TogglePlot::Request>();
+    request->name = name;
+    auto result = toggle_plot_client_->async_send_request(request);
+    if (result.wait_for(0.1s) == std::future_status::ready) {
+        const auto status = result.get()->status;
+        if (status ==
+            control_reproduce_interfaces::srv::TogglePlot::Request::FAILED) {
+            RTT::log(RTT::Info)
+                << "Plot " << name << " does not exist" << RTT::endlog();
+        } else {
+            RTT::log(RTT::Info)
+                << "Plot " << name << " is "
+                << (status == control_reproduce_interfaces::srv::TogglePlot::
+                                  Request::SHOWN
+                        ? "shown"
+                        : "hidden")
+                << RTT::endlog();
+        }
+
+    } else {
+        RTT::log(RTT::Info) << "Failed to call service" << RTT::endlog();
+    }
 }
 
 std::ostream& operator<<(std::ostream& os,

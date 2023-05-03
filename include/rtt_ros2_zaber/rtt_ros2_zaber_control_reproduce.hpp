@@ -8,6 +8,7 @@
 #include "control_reproduce_interfaces/msg/measurement.hpp"
 #include "control_reproduce_interfaces/msg/tip_position.hpp"
 #include "control_reproduce_interfaces/srv/add_filtered_demo_wpts.hpp"
+#include "control_reproduce_interfaces/srv/toggle_plot.hpp"
 #include "rtt_ros2_zaber/auto_insertion_command.hpp"
 #include "rtt_ros2_zaber/rtt_ros2_zaber_base.hpp"
 #include "rtt_ros2_zaber/sg_filter.hpp"
@@ -34,6 +35,8 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     void clearDemoTrajPlot() const;
     void clearReproduceTrajPlot() const;
+
+    void togglePlot(const std::string& name);
 
     enum class State { IDLE, DEMO, CONTROL };
 
@@ -78,14 +81,13 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     Eigen::Vector3d prev_tip_position_;
     Eigen::Matrix3d jacobian_;
     Eigen::Matrix3d jacobian_inv_;
-    double jacobian_update_step_;   // s
+    double jacobian_update_step_;  // s
     bool use_estimate_tip_position_;
 
     double target_ahead_dis_;  // mm
     double max_control_vel_;
-    double y_error_tolerance_;  // mm
+    double y_error_tolerance_;   // mm
     double xz_error_tolerance_;  // mm
-
 
     long prev_cmd_time_;       // ns
     long prev_jacobian_time_;  // ns
@@ -110,6 +112,9 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     RTT::OutputPort<control_reproduce_interfaces::msg::TipPosition>
         port_jacobian_update_tp_;
     control_reproduce_interfaces::msg::TipPosition jacobian_update_tp_msg_;
+
+    rclcpp::Client<control_reproduce_interfaces::srv::TogglePlot>::SharedPtr
+        toggle_plot_client_;
 };
 
 std::ostream& operator<<(std::ostream& os,

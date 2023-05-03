@@ -16,7 +16,7 @@ stream("zaber_control_reproduce.reproduce_wpt", ros.topic("/reproduce_wpt", fals
 stream("zaber_control_reproduce.reproduce_tp_filtered", ros.topic("/reproduce_tp_filtered", false))
 stream("zaber_control_reproduce.jacobian_update_tp", ros.topic("/jacobian_update_tp", false))
 
-zaber_control_reproduce.device_file = "/dev/ttyUSB2"
+zaber_control_reproduce.device_file = "/dev/ttyUSB1"
 
 zaber_control_reproduce.max_control_vel = 1.0
 zaber_control_reproduce.jacobian_update_step = 0.5
