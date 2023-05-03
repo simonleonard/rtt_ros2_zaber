@@ -344,10 +344,6 @@ void RttRos2ZaberControlReproduce::sendControlVels(
     Eigen::Vector3d curr_tip_position) {
     // Calculate control input.
     Eigen::Vector3d error = current_target_ - curr_tip_position;
-    error = (error.cwiseAbs().array() < Eigen::Array3d(xz_error_tolerance_,
-                                                       y_error_tolerance_,
-                                                       xz_error_tolerance_))
-                .select(0.0, error);
     Eigen::Vector3d control_input = jacobian_inv_ * error;
     control_input *= max_control_vel_ / control_input.norm();
 
@@ -363,8 +359,13 @@ void RttRos2ZaberControlReproduce::sendControlVels(
     prev_cmd_time_ = curr_time_;
 
     // Send velocities.
+    // control_input = (error.cwiseAbs().array() <
+    //                  Eigen::Array3d(xz_error_tolerance_, y_error_tolerance_,
+    //                                 xz_error_tolerance_))
+    //                     .select(0.0, control_input);
+
     axes_.at("TX").sendVel(control_input.x());
-    axes_.at("LS").sendVel(control_input.y());
+    axes_.at("LS").sendVel(std::max(control_input.y(), 0.1));
     axes_.at("TZ").sendVel(control_input.z());
 }
 
@@ -372,14 +373,6 @@ void RttRos2ZaberControlReproduce::controlLoop() {
     reproduce_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
     if (reproduce_filtering_) {
-        // if (!reproduce_traj_.filter_tip_position_xz_last(*filter_)) {
-        //     RTT::log(RTT::Info)
-        //         << "Accumulating measurements..." << RTT::endlog();
-        //     prev_joint_states_ = joint_states_;
-        //     prev_tip_position_ = tip_position_;
-        //     prev_jacobian_time_ = curr_time_;
-        //     return;
-        // }
         reproduce_traj_.filter_tip_position_xz_last(*filter_);
 
         curr_repr_tip_filtered_msg_.x = reproduce_traj_.tip_x_filtered().back();
