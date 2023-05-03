@@ -4,7 +4,6 @@ import("rtt_ros2_topics")
 import("rtt_ros2_geometry_msgs")
 import("rtt_ros2_sensor_msgs")
 import("rtt_ros2_std_msgs")
-import("rtt_ros2_needle_steering_control_demo_msgs")
 import("rtt_ros2_control_reproduce_interfaces")
 import("rtt_ros2_zaber")
 

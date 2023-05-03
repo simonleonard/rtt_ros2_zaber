@@ -11,9 +11,40 @@
 #include <rtt/TaskContext.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <string>
+#include <unordered_map>
 
 #include "Eigen/Dense"
 #include "control_reproduce_interfaces/msg/measurement.hpp"
+
+class NeedleSteeringZaberAxis {
+   public:
+    NeedleSteeringZaberAxis(const std::string& name, double home,
+                            double upper_limit, double lower_limit,
+                            const zaber::motion::ascii::Axis& axis);
+    NeedleSteeringZaberAxis(const NeedleSteeringZaberAxis&) = delete;
+    NeedleSteeringZaberAxis& operator=(const NeedleSteeringZaberAxis&) = delete;
+
+    const std::string& name() const { return name_; }
+    double getPosition();
+    void moveAbs(double position, double velocity, double accel);
+    void moveRel(double position, double velocity, double accel);
+    void sendVel(double vel);
+    void home(bool wait_until_idle = false);
+    void stop();
+    std::pair<double, double> getRange() const {
+        return std::make_pair(lower_limit_ - home_, upper_limit_ - home_);
+    }
+
+   private:
+    bool withinRange(double position) const;
+    bool busy();
+    std::string name_;
+    double home_;
+    double lower_limit_;
+    double upper_limit_;
+
+    zaber::motion::ascii::Axis axis_;
+};
 
 class RttRos2ZaberBase : public RTT::TaskContext {
    public:
@@ -25,21 +56,18 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     void stopHook() override;
     void cleanupHook() override;
 
-    double getPositionLS();
-    double getPositionTX();
-    double getPositionTZ();
+    double getPosition(const std::string& name);
+    void moveAbs(const std::string& name, double position, double velocity,
+                 double accel);
+    void moveRel(const std::string& name, double distance, double velocity,
+                 double accel);
+    std::pair<double, double> getRange(const std::string& name) const;
 
     void printJointPositions();
     void printTipPosition() const;
 
-    void MoveRelativeLS(double distance, double velocity);
-    void MoveRelativeTX(double distance, double velocity);
-    void MoveRelativeTZ(double distance, double velocity);
-    void MoveAbsoluteLS(double pose, double velocity, double accel);
-    void MoveAbsoluteTX(double pose, double velocity, double accel);
-    void MoveAbsoluteTZ(double pose, double velocity, double accel);
-
     void home();
+    void stopAllAxes();
 
    protected:
     void setHome(bool wait_until_idle = false);
@@ -48,24 +76,21 @@ class RttRos2ZaberBase : public RTT::TaskContext {
                          const rclcpp::Time time = rclcpp::Time(0),
                          double time_out = 0.0);
 
-    void start_calibrate(double duration /* s */);
+    void startCalibrate(double duration /* s */);
     void calibration();
-    bool clear_calibration();
+    bool clearCalibration();
+
+    bool deviceNameExists(const std::string& name) const;
 
     // serial port device file
-    std::string device_file;
+    std::string device_file_;
 
-    RTT::Service::shared_ptr global_ros;
+    RTT::Service::shared_ptr global_ros_;
 
-    zaber::motion::ascii::Axis linearStage;
-    zaber::motion::ascii::Axis templateX;
-    zaber::motion::ascii::Axis templateZ;
-
-    zaber::motion::ascii::Device deviceLS;
-    zaber::motion::ascii::Device deviceTX;
-    zaber::motion::ascii::Device deviceTZ;
-
-    zaber::motion::ascii::Connection connection;
+    // Zaber devices
+    zaber::motion::ascii::Connection connection_;
+    std::vector<zaber::motion::ascii::Device> devices_;
+    std::unordered_map<std::string, NeedleSteeringZaberAxis> axes_;
 
     RTT::OutputPort<control_reproduce_interfaces::msg::Measurement> port_meas_;
 
@@ -83,5 +108,4 @@ class RttRos2ZaberBase : public RTT::TaskContext {
     std::vector<Eigen::Vector3d> calibration_points_;
 
     control_reproduce_interfaces::msg::Measurement curr_meas_msg_;
-
 };

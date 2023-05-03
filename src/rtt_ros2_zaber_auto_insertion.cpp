@@ -31,18 +31,9 @@ void RttRos2ZaberAutoInsertion::updateHook() {
         const auto cmd = insert_cmds_.front();
         insert_cmds_.pop();
         std::cout << cmd.joint << std::endl;
-        if (cmd.joint == "LS") {
-            linearStage.moveAbsolute((cmd.target + kLsHome), kLenUnitMM, false,
-                                     cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                     kAccelUnitMMPS2);
-        } else if (cmd.joint == "TX") {
-            templateX.moveAbsolute((cmd.target + kTxHome), kLenUnitMM, false,
-                                   cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                   kAccelUnitMMPS2);
-        } else if (cmd.joint == "TZ") {
-            templateZ.moveAbsolute((cmd.target + kTzHome), kLenUnitMM, false,
-                                   cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                   kAccelUnitMMPS2);
+        if (cmd.joint == "LS" || cmd.joint == "TX" || cmd.joint == "TZ") {
+            axes_.at(cmd.joint).moveAbs(cmd.target, cmd.velocity,
+                                           kDefaultAccel);
         } else if (cmd.joint == "END") {
             insertion_start_time_ = std::numeric_limits<long>::max() / 2;
         }

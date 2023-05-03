@@ -2,25 +2,19 @@
 
 #include <zaber/motion/units.h>
 
-// constexpr double kTxHome = 12.5;
-// constexpr double kTxLowerLimit = 7.5;
-// constexpr double kTxUpperLimit = 17.5;
+const int kNumDevices = 3;
 
 constexpr double kTxHome = 11.5;
 constexpr double kTxLowerLimit = 6.5;
 constexpr double kTxUpperLimit = 16.5;
 
-// constexpr double kTzHome = 10.0;
-// constexpr double kTzLowerLimit = 5.0;
-// constexpr double kTzUpperLimit = 15.0;
+constexpr double kLsHome = 20.0;
+constexpr double kLsLowerLimit = 20.0;
+constexpr double kLsUpperLimit = 120.0;
 
 constexpr double kTzHome = 9.0;
 constexpr double kTzLowerLimit = 4.0;
 constexpr double kTzUpperLimit = 14.0;
-
-constexpr double kLsHome = 20.0;
-constexpr double kLsLowerLimit = 20.0;
-constexpr double kLsUpperLimit = 120.0;
 
 constexpr double kDefaultVel = 2.5;   /* mm / s */
 constexpr double kDefaultAccel = 0.5; /* mm / s^2 */

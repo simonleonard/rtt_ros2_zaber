@@ -32,21 +32,21 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     void save_reproduce_results(const std::string& experiment);
 
-    void clear_demo_traj_plot() const;
-    void clear_reproduce_traj_plot() const;
+    void clearDemoTrajPlot() const;
+    void clearReproduceTrajPlot() const;
 
     enum class State { IDLE, DEMO, CONTROL };
 
    private:
-    void collect_demo_points();
+    void collectDemoPoints();
 
-    bool safety_check();
+    bool safetyCheck();
 
-    bool update_target(Eigen::Vector3d curr_tip_position);
-    Eigen::Vector3d update_jacobian();
-    void send_control_vels(Eigen::Vector3d curr_tip_position);
+    bool updateTarget(Eigen::Vector3d curr_tip_position);
+    Eigen::Vector3d updateJacobian();
+    void sendControlVels(Eigen::Vector3d curr_tip_position);
 
-    void control_loop();
+    void controlLoop();
 
     State state_;
 

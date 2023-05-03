@@ -34,10 +34,10 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
                  &RttRos2ZaberControlReproduce::save_reproduce_results, this,
                  RTT::OwnThread);
     addOperation("ClearDemoTrajPlot",
-                 &RttRos2ZaberControlReproduce::clear_demo_traj_plot, this,
+                 &RttRos2ZaberControlReproduce::clearDemoTrajPlot, this,
                  RTT::OwnThread);
     addOperation("ClearReproduceTrajPlot",
-                 &RttRos2ZaberControlReproduce::clear_reproduce_traj_plot, this,
+                 &RttRos2ZaberControlReproduce::clearReproduceTrajPlot, this,
                  RTT::OwnThread);
 
     addProperty("max_control_vel", max_control_vel_);
@@ -91,9 +91,9 @@ void RttRos2ZaberControlReproduce::updateHook() {
     RttRos2ZaberBase::updateHook();
 
     if (state_ == State::DEMO) {
-        collect_demo_points();
+        collectDemoPoints();
     } else if (state_ == State::CONTROL) {
-        control_loop();
+        controlLoop();
     }
 }
 
@@ -140,14 +140,14 @@ void RttRos2ZaberControlReproduce::autoInsertion(const std::string& file) {
                         << RTT::endlog();
 
     demo_traj_.clear();
-    clear_demo_traj_plot();
-    clear_reproduce_traj_plot();
+    clearDemoTrajPlot();
+    clearReproduceTrajPlot();
 
     state_ = State::DEMO;
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
 }
 
-void RttRos2ZaberControlReproduce::collect_demo_points() {
+void RttRos2ZaberControlReproduce::collectDemoPoints() {
     demo_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
     port_demo_wpt_.write(curr_meas_msg_);
@@ -159,18 +159,9 @@ void RttRos2ZaberControlReproduce::collect_demo_points() {
         insert_cmds_.pop();
 
         RTT::log(RTT::Info) << cmd.joint << RTT::endlog();
-        if (cmd.joint == "LS") {
-            linearStage.moveAbsolute((cmd.target + kLsHome), kLenUnitMM, false,
-                                     cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                     kAccelUnitMMPS2);
-        } else if (cmd.joint == "TX") {
-            templateX.moveAbsolute((cmd.target + kTxHome), kLenUnitMM, false,
-                                   cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                   kAccelUnitMMPS2);
-        } else if (cmd.joint == "TZ") {
-            templateZ.moveAbsolute((cmd.target + kTzHome), kLenUnitMM, false,
-                                   cmd.velocity, kVelUnitMMPS, kDefaultAccel,
-                                   kAccelUnitMMPS2);
+        if (cmd.joint == "LS" || cmd.joint == "TX" || cmd.joint == "TZ") {
+            axes_.at(cmd.joint).moveAbs(cmd.target, cmd.velocity,
+                                           kDefaultAccel);
         } else if (cmd.joint == "END") {
             if (demo_filtering_) {
                 filter_.reset(new SavitzkyGolayFilter(
@@ -219,7 +210,7 @@ void RttRos2ZaberControlReproduce::reproduce() {
     reproduce_traj_.clear();
     demo_traj_itr_->first();
 
-    clear_reproduce_traj_plot();
+    clearReproduceTrajPlot();
 
     prev_tip_position_ = tip_position_;
     prev_joint_states_ = joint_states_;
@@ -244,16 +235,15 @@ void RttRos2ZaberControlReproduce::reproduce() {
     RTT::log(RTT::Info) << "Switch to state: " << state_ << RTT::endlog();
 }
 
-bool RttRos2ZaberControlReproduce::safety_check() {
+bool RttRos2ZaberControlReproduce::safetyCheck() {
     if (joint_states_.x() + kTxHome < kTxLowerLimit ||
         joint_states_.x() + kTxHome > kTxUpperLimit ||
         joint_states_.y() + kLsHome < kLsLowerLimit ||
         joint_states_.y() + kLsHome > kLsUpperLimit ||
         joint_states_.z() + kTzHome < kTzLowerLimit ||
         joint_states_.z() + kTzHome > kTzUpperLimit) {
-        linearStage.stop();
-        templateX.stop();
-        templateZ.stop();
+        stopAllAxes();
+
         state_ = State::IDLE;
         RTT::log(RTT::Error)
             << "Joint out of range! Stopped\n"
@@ -267,7 +257,7 @@ bool RttRos2ZaberControlReproduce::safety_check() {
     return true;
 }
 
-bool RttRos2ZaberControlReproduce::update_target(
+bool RttRos2ZaberControlReproduce::updateTarget(
     Eigen::Vector3d curr_tip_position) {
     Eigen::Vector3d e_abs = (current_target_ - curr_tip_position).cwiseAbs();
     // Update target.
@@ -276,9 +266,7 @@ bool RttRos2ZaberControlReproduce::update_target(
             e_abs.z() < xz_error_tolerance_)) {
         // Stop if no target left.
         if (demo_traj_itr_->isDone()) {
-            linearStage.stop();
-            templateX.stop();
-            templateZ.stop();
+            stopAllAxes();
 
             state_ = State::IDLE;
 
@@ -313,7 +301,7 @@ bool RttRos2ZaberControlReproduce::update_target(
     return true;
 }
 
-Eigen::Vector3d RttRos2ZaberControlReproduce::update_jacobian() {
+Eigen::Vector3d RttRos2ZaberControlReproduce::updateJacobian() {
     Eigen::Vector3d dx = joint_states_ - prev_joint_states_;
     Eigen::Vector3d dy = tip_position_ - prev_tip_position_;
     if ((curr_time_ - prev_jacobian_time_) * 1.0e-9 > jacobian_update_step_ &&
@@ -343,7 +331,7 @@ Eigen::Vector3d RttRos2ZaberControlReproduce::update_jacobian() {
                                       : tip_position_;
 }
 
-void RttRos2ZaberControlReproduce::send_control_vels(
+void RttRos2ZaberControlReproduce::sendControlVels(
     Eigen::Vector3d curr_tip_position) {
     // Calculate control input.
     Eigen::Vector3d error = current_target_ - curr_tip_position;
@@ -366,12 +354,12 @@ void RttRos2ZaberControlReproduce::send_control_vels(
     prev_cmd_time_ = curr_time_;
 
     // Send velocities.
-    templateX.moveVelocity(control_input.x(), kVelUnitMMPS);
-    linearStage.moveVelocity(control_input.y(), kVelUnitMMPS);
-    templateZ.moveVelocity(control_input.z(), kVelUnitMMPS);
+    axes_.at("TX").sendVel(control_input.x());
+    axes_.at("LS").sendVel(control_input.y());
+    axes_.at("TZ").sendVel(control_input.z());
 }
 
-void RttRos2ZaberControlReproduce::control_loop() {
+void RttRos2ZaberControlReproduce::controlLoop() {
     reproduce_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
     if (reproduce_filtering_) {
@@ -396,13 +384,13 @@ void RttRos2ZaberControlReproduce::control_loop() {
 
     port_reproduce_wpt_.write(curr_meas_msg_);
 
-    if (!safety_check()) return;
+    if (!safetyCheck()) return;
 
-    Eigen::Vector3d curr_tip_position = update_jacobian();
+    Eigen::Vector3d curr_tip_position = updateJacobian();
 
-    if (!update_target(curr_tip_position)) return;
+    if (!updateTarget(curr_tip_position)) return;
 
-    send_control_vels(curr_tip_position);
+    sendControlVels(curr_tip_position);
 }
 
 void RttRos2ZaberControlReproduce::save_reproduce_results(
@@ -420,12 +408,12 @@ void RttRos2ZaberControlReproduce::save_reproduce_results(
                                   reproduce_filtering_);
 }
 
-void RttRos2ZaberControlReproduce::clear_demo_traj_plot() const {
+void RttRos2ZaberControlReproduce::clearDemoTrajPlot() const {
     auto request = std::make_shared<std_srvs::srv::Empty::Request>();
     clear_demo_wpts_client_->async_send_request(request);
 }
 
-void RttRos2ZaberControlReproduce::clear_reproduce_traj_plot() const {
+void RttRos2ZaberControlReproduce::clearReproduceTrajPlot() const {
     auto request = std::make_shared<std_srvs::srv::Empty::Request>();
     clear_reproduce_wpts_client_->async_send_request(request);
 }

@@ -4,7 +4,7 @@ import("rtt_ros2_topics")
 import("rtt_ros2_geometry_msgs")
 import("rtt_ros2_sensor_msgs")
 import("rtt_ros2_std_msgs")
-import("rtt_ros2_needle_steering_control_demo_msgs")
+import("rtt_ros2_control_reproduce_interfaces")
 import("rtt_ros2_zaber")
 
 loadComponent("zaber_base", "RttRos2ZaberBase" )
@@ -12,6 +12,6 @@ setActivity("zaber_base", 0.01, 0, ORO_SCHED_OTHER)
 
 stream("zaber_base.control_measurement", ros.topic("/control_measurement", false))
 
-zaber_base.device_file = "/dev/ttyUSB1"
+zaber_base.device_file = "/dev/ttyUSB2"
 zaber_base.configure() 
 zaber_base.start() 
