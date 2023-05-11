@@ -37,16 +37,16 @@ std::unique_ptr<TrajCollectorIterator> TrajCollector::createrIterator(
     return std::make_unique<TrajCollectorIterator>(*this, filtered);
 }
 
-bool TrajCollector::filter_tip_position_xz_last(
+bool TrajCollector::filter_tip_position_last(
     const SavitzkyGolayFilter& filter) {
-    y_filtered_.push_back(y_.back());
-
     if (x_.size() < filter.window_size()) {
         x_filtered_.push_back(x_.back());
+        y_filtered_.push_back(y_.back());
         z_filtered_.push_back(z_.back());
         return false;
     }
     x_filtered_.push_back(filter.filter_last_one(x_));
+    y_filtered_.push_back(filter.filter_last_one(y_));
     z_filtered_.push_back(filter.filter_last_one(z_));
     return true;
 }

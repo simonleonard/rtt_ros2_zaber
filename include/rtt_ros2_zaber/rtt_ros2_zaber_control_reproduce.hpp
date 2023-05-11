@@ -38,6 +38,8 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
 
     void togglePlot(const std::string& name);
 
+    void setMinLsVel(double vel);
+
     enum class State { IDLE, DEMO, CONTROL };
 
    private:
@@ -88,6 +90,7 @@ class RttRos2ZaberControlReproduce : public RttRos2ZaberBase {
     double max_control_vel_;
     double y_error_tolerance_;   // mm
     double xz_error_tolerance_;  // mm
+    double min_ls_vel_;          // mm/s
 
     long prev_cmd_time_;       // ns
     long prev_jacobian_time_;  // ns

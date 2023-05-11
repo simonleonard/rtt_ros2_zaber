@@ -29,7 +29,7 @@ class TrajCollector {
     const std::vector<double>& tip_z_filtered() const { return z_filtered_; }
 
     void filter_tip_position_all(const SavitzkyGolayFilter& filter);
-    bool filter_tip_position_xz_last(const SavitzkyGolayFilter& filter);
+    bool filter_tip_position_last(const SavitzkyGolayFilter& filter);
 
     void clear();
     std::unique_ptr<TrajCollectorIterator> createrIterator(bool filtered) const;

@@ -23,12 +23,13 @@ zaber_control_reproduce.jacobian_update_step = 0.5
 zaber_control_reproduce.target_ahead_dis = 0.5
 zaber_control_reproduce.y_error_tolerance = 0.1
 zaber_control_reproduce.xz_error_tolerance = 0.2
+zaber_control_reproduce.min_ls_vel = 0.1
 
 zaber_control_reproduce.demo_filtering = true
 zaber_control_reproduce.demo_filter_window = 21
 zaber_control_reproduce.demo_filter_order = 2
 
-zaber_control_reproduce.reproduce_filtering = false
+zaber_control_reproduce.reproduce_filtering = true
 zaber_control_reproduce.reproduce_filter_window = 15
 zaber_control_reproduce.reproduce_filter_order = 2
 

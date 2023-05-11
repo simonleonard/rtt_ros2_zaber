@@ -17,7 +17,8 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
       ready_to_reproduce_(false),
       demo_filtering_(false),
       reproduce_filtering_(false),
-      use_estimate_tip_position_(false) {
+      use_estimate_tip_position_(false),
+      min_ls_vel_(std::numeric_limits<double>::min()) {
     addOperation("Jacobian", &RttRos2ZaberControlReproduce::printJacobian, this,
                  RTT::OwnThread);
     addOperation("SetJacobian", &RttRos2ZaberControlReproduce::setJacobian,
@@ -44,6 +45,9 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addOperation("TogglePlot", &RttRos2ZaberControlReproduce::togglePlot, this,
                  RTT::OwnThread);
 
+    addOperation("SetMinLsVel", &RttRos2ZaberControlReproduce::setMinLsVel,
+                 this, RTT::OwnThread);
+
     addProperty("max_control_vel", max_control_vel_);
     addProperty("jacobian_update_step", jacobian_update_step_);
     addProperty("target_ahead_dis", target_ahead_dis_);
@@ -61,6 +65,8 @@ RttRos2ZaberControlReproduce::RttRos2ZaberControlReproduce(
     addProperty("use_estimate_tip_position", use_estimate_tip_position_);
 
     addProperty("reproduce_result_folder", reproduce_result_folder_);
+
+    addProperty("min_ls_vel", min_ls_vel_);
 
     addPort("demo_wpt", port_demo_wpt_);
     addPort("reproduce_wpt", port_reproduce_wpt_);
@@ -346,6 +352,7 @@ void RttRos2ZaberControlReproduce::sendControlVels(
     Eigen::Vector3d error = current_target_ - curr_tip_position;
     Eigen::Vector3d control_input = jacobian_inv_ * error;
     control_input *= max_control_vel_ / control_input.norm();
+    control_input.y() = std::max(control_input.y(), min_ls_vel_);
 
     RTT::log(RTT::Info)
         << "\nCurrent Target        : " << current_target_.transpose()
@@ -359,13 +366,8 @@ void RttRos2ZaberControlReproduce::sendControlVels(
     prev_cmd_time_ = curr_time_;
 
     // Send velocities.
-    // control_input = (error.cwiseAbs().array() <
-    //                  Eigen::Array3d(xz_error_tolerance_, y_error_tolerance_,
-    //                                 xz_error_tolerance_))
-    //                     .select(0.0, control_input);
-
     axes_.at("TX").sendVel(control_input.x());
-    axes_.at("LS").sendVel(std::max(control_input.y(), 0.1));
+    axes_.at("LS").sendVel(control_input.y());
     axes_.at("TZ").sendVel(control_input.z());
 }
 
@@ -373,7 +375,7 @@ void RttRos2ZaberControlReproduce::controlLoop() {
     reproduce_traj_.addPoint(joint_states_, tip_position_, curr_time_);
 
     if (reproduce_filtering_) {
-        reproduce_traj_.filter_tip_position_xz_last(*filter_);
+        reproduce_traj_.filter_tip_position_last(*filter_);
 
         curr_repr_tip_filtered_msg_.x = reproduce_traj_.tip_x_filtered().back();
         curr_repr_tip_filtered_msg_.y = reproduce_traj_.tip_y_filtered().back();
@@ -381,6 +383,7 @@ void RttRos2ZaberControlReproduce::controlLoop() {
         port_reproduce_tp_filtered_.write(curr_repr_tip_filtered_msg_);
 
         tip_position_.x() = reproduce_traj_.tip_x_filtered().back();
+        // tip_position_.y() = reproduce_traj_.tip_y_filtered().back();
         tip_position_.z() = reproduce_traj_.tip_z_filtered().back();
     }
 
@@ -456,6 +459,10 @@ void RttRos2ZaberControlReproduce::togglePlot(const std::string& name) {
     } else {
         RTT::log(RTT::Info) << "Failed to call service" << RTT::endlog();
     }
+}
+
+void RttRos2ZaberControlReproduce::setMinLsVel(double vel) {
+    min_ls_vel_ = (vel < 0.0 ? std::numeric_limits<double>::min() : vel);
 }
 
 std::ostream& operator<<(std::ostream& os,
