@@ -17,7 +17,7 @@ public:
     rtt_ros2_zaber(const std::string& name);
 
     bool configureHook() override; 
-    bool startHook() override; 
+    void startHook() override; 
     void updateHook() override; 
     void stopHook() override; 
     void cleanupHook() override; 

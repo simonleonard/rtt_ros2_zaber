@@ -72,7 +72,7 @@ bool rtt_ros2_zaber::configureHook(){
 
 }
 
-bool rtt_ros2_zaber::startHook() {
+void rtt_ros2_zaber::startHook() {
 
     std::cout << "Started startHook" << std::endl;
 
