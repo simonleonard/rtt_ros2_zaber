@@ -22,7 +22,9 @@ find_package(rtt_ros2 REQUIRED)
 find_package(rtt_ros2_node REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(control_reproduce_interfaces REQUIRED)
 
 if(BUILD_TESTING)
@@ -50,6 +52,8 @@ target_link_libraries(rtt_ros2_zaber_base
 ament_target_dependencies(rtt_ros2_zaber_base
   tf2
   tf2_ros
+  tf2_geometry_msgs
+  sensor_msgs
   control_reproduce_interfaces
 )
 
@@ -70,6 +74,8 @@ target_link_libraries(rtt_ros2_zaber_control_reproduce
 )
 ament_target_dependencies(rtt_ros2_zaber_control_reproduce
   std_srvs
+  tf2_geometry_msgs
+  sensor_msgs
 )
 
 orocos_generate_package()
